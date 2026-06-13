@@ -85,10 +85,11 @@ Pre-built Linux binaries are available on the [releases page](https://github.com
 For `amd64`:
 
 ```bash
+cd /tmp
 curl -LO https://github.com/smeir/Zeitspur/releases/latest/download/zeitspur-linux-amd64.tar.gz
 tar -xzf zeitspur-linux-amd64.tar.gz
 chmod +x zeitspur
-sudo mv zeitspur /usr/local/bin/
+./zeitspur install
 ```
 
 Replace `amd64` with `arm64` for ARM systems.
