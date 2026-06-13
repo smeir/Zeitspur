@@ -77,7 +77,7 @@ All standard tasks run through the `Makefile`:
 make deps    # download dependencies
 make build   # build the binary: CGO_ENABLED=0 go build -trimpath -o zeitspur ./cmd/zeitspur
 make test    # go test ./...
-make lint    # go fmt ./... && go vet ./...
+make lint    # go fmt ./... && go vet ./... && go run scripts/boundaries.go
 make run     # build and run 'serve'
 make clean   # remove the binary, clear the test cache
 ```

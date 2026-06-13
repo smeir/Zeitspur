@@ -1,4 +1,4 @@
-.PHONY: build test lint run clean deps fmt vet
+.PHONY: build test lint run clean deps fmt vet boundaries
 
 BINARY := zeitspur
 BUILD_FLAGS := -trimpath
@@ -15,7 +15,7 @@ build-all:
 test:
 	go test ./...
 
-lint: fmt vet
+lint: fmt vet boundaries
 
 run: build
 	./$(BINARY) serve
@@ -32,3 +32,6 @@ fmt:
 
 vet:
 	go vet ./...
+
+boundaries:
+	go run scripts/boundaries.go

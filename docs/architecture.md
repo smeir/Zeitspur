@@ -110,6 +110,8 @@ The codebase keeps three layers distinct:
 2. **Domain (`booking`, `closure`, `timeline`)** reads raw events and derived blocks and implements business rules.
 3. **Presentation (`web`)** renders HTML and handles form posts; it never contains capture or calculation logic.
 
+`scripts/boundaries.go` enforces these rules by checking every internal import. The only current exception is `web` importing `internal/activity` because the `ActivityProvider` contract still lives in the capture package. When that contract is moved to a dedicated package, the exception should be removed.
+
 ## Activity Detection And Event Flow
 
 ```mermaid
@@ -400,16 +402,17 @@ Unit tests cover:
 Use the `Makefile` at the repository root:
 
 ```bash
-make deps    # download dependencies
-make build   # CGO_ENABLED=0 go build -trimpath -o zeitspur ./cmd/zeitspur
-make test    # go test ./...
-make lint    # go fmt ./... && go vet ./...
-make run     # build and run 'serve'
-make clean   # remove the binary and clear the test cache
+make deps        # download dependencies
+make build       # CGO_ENABLED=0 go build -trimpath -o zeitspur ./cmd/zeitspur
+make test        # go test ./...
+make lint        # go fmt ./... && go vet ./... && go run scripts/boundaries.go
+make boundaries  # run the architectural import-boundary check only
+make run         # build and run 'serve'
+make clean       # remove the binary and clear the test cache
 ```
 
 Before committing:
 
-1. Run `make lint`; the code must be `gofmt`-clean and `go vet`-clean.
+1. Run `make lint`; the code must be `gofmt`-clean, `go vet`-clean, and pass the boundary check.
 2. Run `make test`.
 3. For concurrency-related changes, also run `go test -race ./...`.
