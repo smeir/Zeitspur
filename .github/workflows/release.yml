@@ -37,17 +37,20 @@ jobs:
           GOARCH: ${{ matrix.goarch }}
           VERSION: ${{ github.ref_name }}
         run: |
-          output="zeitspur-${GOOS}-${GOARCH}"
-          CGO_ENABLED=0 go build -trimpath -ldflags "-X main.version=${VERSION}" -o "${output}" ./cmd/zeitspur
-          sha256sum "${output}" > "${output}.sha256"
+          archive="zeitspur-${GOOS}-${GOARCH}.tar.gz"
+          staging="staging/zeitspur-${GOOS}-${GOARCH}"
+          mkdir -p "${staging}"
+          CGO_ENABLED=0 go build -trimpath -ldflags "-X main.version=${VERSION}" -o "${staging}/zeitspur" ./cmd/zeitspur
+          tar -czf "${archive}" -C "${staging}" zeitspur
+          sha256sum "${archive}" > "${archive}.sha256"
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
           name: zeitspur-${{ matrix.goos }}-${{ matrix.goarch }}
           path: |
-            zeitspur-${{ matrix.goos }}-${{ matrix.goarch }}
-            zeitspur-${{ matrix.goos }}-${{ matrix.goarch }}.sha256
+            zeitspur-${{ matrix.goos }}-${{ matrix.goarch }}.tar.gz
+            zeitspur-${{ matrix.goos }}-${{ matrix.goarch }}.tar.gz.sha256
           if-no-files-found: error
 
   release:
