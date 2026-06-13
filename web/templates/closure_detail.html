@@ -1,0 +1,32 @@
+{{ define "content" }}
+<div class="card">
+  <h2>Closure #{{ .Closure.ID }}</h2>
+  <p>Period: <strong>{{ .Closure.PeriodStart }} - {{ .Closure.PeriodEnd }}</strong></p>
+  <p>Booking Day: {{ .Closure.BookingDay }}</p>
+  <p>Closed at: {{ .Closure.ClosedAt.Format "2006-01-02 15:04" }}</p>
+  <p>Tracked workdays: {{ .Closure.TrackedWorkdayCount }}</p>
+  <p>Booked: {{ .Closure.BookedWorkdayCount }} &middot; Unbooked: {{ .Closure.UnbookedWorkdayCount }}</p>
+  <p>Total minutes: {{ .Closure.TrackedMinutesSnapshot }}</p>
+  {{ if .Differs }}
+    <p class="changed">Current data differs from this snapshot.</p>
+  {{ end }}
+</div>
+
+<div class="card">
+  <h3>Day snapshot</h3>
+  <table>
+    <thead>
+      <tr><th>Date</th><th>Booked</th><th>Tracked minutes</th></tr>
+    </thead>
+    <tbody>
+    {{ range .Closure.Days }}
+      <tr>
+        <td>{{ .WorkDate }}</td>
+        <td>{{ if .BookedSnapshot }}yes{{ else }}no{{ end }}</td>
+        <td>{{ .TrackedMinutes }}</td>
+      </tr>
+    {{ end }}
+    </tbody>
+  </table>
+</div>
+{{ end }}

@@ -1,0 +1,28 @@
+{{ define "content" }}
+<div class="card">
+  <h2>Historical Closures</h2>
+  {{ if .Closures }}
+  <table>
+    <thead>
+      <tr><th>Period</th><th>Booking Day</th><th>Closed</th><th>Days</th><th>Booked</th><th>Unbooked</th><th>Minutes</th><th>Differs</th></tr>
+    </thead>
+    <tbody>
+    {{ range .Closures }}
+      <tr>
+        <td><a href="/closures/{{ .ID }}">{{ .PeriodStart }} - {{ .PeriodEnd }}</a></td>
+        <td>{{ .BookingDay }}</td>
+        <td>{{ .ClosedAt.Format "2006-01-02 15:04" }}</td>
+        <td>{{ .TrackedWorkdayCount }}</td>
+        <td>{{ .BookedWorkdayCount }}</td>
+        <td>{{ .UnbookedWorkdayCount }}</td>
+        <td>{{ .TrackedMinutesSnapshot }}</td>
+        <td>{{ if .Differs }}yes{{ else }}no{{ end }}</td>
+      </tr>
+    {{ end }}
+    </tbody>
+  </table>
+  {{ else }}
+    <p>No closures yet.</p>
+  {{ end }}
+</div>
+{{ end }}

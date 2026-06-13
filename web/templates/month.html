@@ -1,0 +1,26 @@
+{{ define "content" }}
+<div class="card">
+  <h2>{{ .Month.Format "January 2006" }}</h2>
+  <div style="display:flex;gap:1rem;margin-bottom:1rem;">
+    <a class="btn secondary" href="/month?date={{ .PrevMonth.Format "2006-01-02" }}">Previous</a>
+    <a class="btn secondary" href="/month?date={{ .NextMonth.Format "2006-01-02" }}">Next</a>
+  </div>
+  <div class="calendar">
+    {{ range .Cells }}
+      {{ if .Empty }}
+        <div class="day empty"></div>
+      {{ else }}
+        <a href="/day/{{ .Date }}" class="day" style="text-decoration:none;color:inherit;">
+          <div class="date">{{ .DayNum }}</div>
+          {{ if .HasWork }}
+            <div class="bar" style="width: {{ .BarWidth }}%;"></div>
+            <div class="minutes">{{ .WorkedMinutes }}m</div>
+          {{ end }}
+          {{ if .Booked }}<span class="booked">B</span>{{ end }}
+          {{ if .ChangedAfterBooking }}<span class="changed">!</span>{{ end }}
+        </a>
+      {{ end }}
+    {{ end }}
+  </div>
+</div>
+{{ end }}

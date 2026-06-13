@@ -1,0 +1,68 @@
+{{ define "content" }}
+<div class="card" hx-get="/today/status" hx-trigger="every 10s" hx-swap="outerHTML">
+  <h2>Today - {{ .Date }}</h2>
+  <p>
+    Status:
+    <span class="status-badge status-{{ .Status }}">{{ .Status }}</span>
+  </p>
+  {{ if .CurrentBlockStart }}
+    <p>Current block started at {{ .CurrentBlockStart.Format "15:04" }} ({{ .RunningMinutes }} min so far)</p>
+  {{ end }}
+  <p>Worked: {{ .WorkedMinutes }} min (incl. running block) &middot; Pause: {{ .PauseMinutes }} min</p>
+  <p>Booking: <span class="{{ if .Booked }}booked{{ else }}unbooked{{ end }}">{{ if .Booked }}booked{{ else }}not booked{{ end }}</span></p>
+  {{ if .ChangedAfterBooking }}
+    <p class="changed">Warning: this day was changed after booking.</p>
+  {{ end }}
+</div>
+
+<div class="card">
+  <h3>Work blocks</h3>
+  {{ if .Blocks }}
+  <table>
+    <thead>
+      <tr><th>Start</th><th>End</th><th>Source</th><th>Note</th><th>Actions</th></tr>
+    </thead>
+    <tbody>
+    {{ range .Blocks }}
+      <tr>
+        <td>{{ .Start.Format "15:04" }}</td>
+        <td>{{ .End.Format "15:04" }}</td>
+        <td>{{ .Source }}</td>
+        <td>{{ .Note }}</td>
+        <td>
+          <form class="inline" action="/day/{{ .Date }}/block/{{ .ID }}/ignore" method="post">
+            <input type="hidden" name="csrf_token" value="{{ $.CSRFToken }}">
+            <button type="submit" class="secondary">Ignore</button>
+          </form>
+        </td>
+      </tr>
+    {{ end }}
+    </tbody>
+  </table>
+  {{ else }}
+    <p>No work blocks recorded yet.</p>
+  {{ end }}
+  <h4>Add manual block</h4>
+  <form action="/day/{{ .Date }}/block" method="post">
+    <input type="hidden" name="csrf_token" value="{{ .CSRFToken }}">
+    <label>Start <input type="time" name="start" required></label>
+    <label>End <input type="time" name="end" required></label>
+    <label>Note <input type="text" name="note"></label>
+    <button type="submit">Add</button>
+  </form>
+</div>
+
+<div class="card">
+  <h3>Booking</h3>
+  <form class="inline" action="/day/{{ .Date }}/book" method="post">
+    <input type="hidden" name="csrf_token" value="{{ .CSRFToken }}">
+    <input type="hidden" name="booked" value="true">
+    <button type="submit">Mark day as booked</button>
+  </form>
+  <form class="inline" action="/day/{{ .Date }}/book" method="post">
+    <input type="hidden" name="csrf_token" value="{{ .CSRFToken }}">
+    <input type="hidden" name="booked" value="false">
+    <button type="submit" class="secondary">Mark day as not booked</button>
+  </form>
+</div>
+{{ end }}

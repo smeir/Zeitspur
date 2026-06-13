@@ -1,0 +1,28 @@
+{{ define "layout" }}<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>{{ .Title }} - Zeitspur</title>
+  <link rel="stylesheet" href="/static/style.css">
+  <script src="/static/htmx.min.js" defer></script>
+</head>
+<body>
+  <header>
+    <nav>
+      <a href="/" class="{{ if eq .Nav "today" }}active{{ end }}">Today</a>
+      <a href="/week" class="{{ if eq .Nav "week" }}active{{ end }}">Week</a>
+      <a href="/month" class="{{ if eq .Nav "month" }}active{{ end }}">Month</a>
+      <a href="/booking" class="{{ if eq .Nav "booking" }}active{{ end }}">Booking</a>
+      <a href="/closures" class="{{ if eq .Nav "closures" }}active{{ end }}">Closures</a>
+      <a href="/settings" class="{{ if eq .Nav "settings" }}active{{ end }}">Settings</a>
+    </nav>
+  </header>
+  <main>
+    {{ if .Flash }}
+      <div class="flash {{ .FlashType }}">{{ .Flash }}</div>
+    {{ end }}
+    {{ template "content" . }}
+  </main>
+</body>
+</html>{{ end }}

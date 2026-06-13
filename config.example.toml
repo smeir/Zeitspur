@@ -1,0 +1,13 @@
+# Zeitspur example configuration file.
+# Copy to ~/.config/zeitspur/config.toml and adjust as needed.
+
+[activity]
+poll_interval = "5s"
+idle_threshold = "3m"
+tail_credit = "30s"
+
+[server]
+listen_address = "127.0.0.1:8787"
+
+[app]
+timezone = "local" # "local" or a valid IANA timezone such as "Europe/Berlin"

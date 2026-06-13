@@ -1,0 +1,22 @@
+{{ define "content" }}
+<div class="card">
+  <h2>Settings</h2>
+  <form action="/settings" method="post">
+    <input type="hidden" name="csrf_token" value="{{ .CSRFToken }}">
+    <label>Poll interval <input type="text" name="poll_interval" value="{{ .Config.Activity.PollInterval }}"></label>
+    <label>Idle threshold <input type="text" name="idle_threshold" value="{{ .Config.Activity.IdleThreshold }}"></label>
+    <label>Tail credit <input type="text" name="tail_credit" value="{{ .Config.Activity.TailCredit }}"></label>
+    <label>Listen address <input type="text" name="listen_address" value="{{ .Config.Server.ListenAddress }}"></label>
+    <label>Timezone
+      <select name="timezone">
+        <option value="local" {{ if eq .Config.App.Timezone "local" }}selected{{ end }}>Use system timezone</option>
+        {{ range .Timezones }}
+          <option value="{{ . }}" {{ if eq . $.Config.App.Timezone }}selected{{ end }}>{{ . }}</option>
+        {{ end }}
+      </select>
+    </label>
+    <button type="submit">Save</button>
+  </form>
+  <p class="muted">Settings are persisted to {{ .ConfigPath }}</p>
+</div>
+{{ end }}

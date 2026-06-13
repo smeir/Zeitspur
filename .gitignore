@@ -1,0 +1,13 @@
+/zeitspur
+*.db
+*.db-journal
+*.db-shm
+*.db-wal
+/tmp/
+/dist/
+/.idea/
+/.vscode/
+*.swp
+*.swo
+*~
+.DS_Store
