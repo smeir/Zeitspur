@@ -56,6 +56,19 @@ zeitspur/
 - **Use the testable abstractions:** Always access time via `clock.Clock` (never `time.Now()` directly in logic), and activity sources via the `ActivityProvider` interface. This keeps tests deterministic.
 - **Migrations are append-only:** Never modify existing migration files in `internal/database/migrations/`. Add new schema changes as new, higher-numbered files (`002_*.sql`, …).
 
+## Architecture documentation
+
+The canonical architecture documentation lives in `docs/architecture.md`. It describes the system overview, layer boundaries, activity/event flow, timeline and booking flow, closure lifecycle, web UI security, persistence model, configuration/deployment, privacy constraints, and testability.
+
+When making changes that affect any of those areas, update `docs/architecture.md` in the same commit so it stays accurate. This includes:
+
+- Adding, removing, or renaming packages under `internal/` or `cmd/`.
+- Changing the database schema or migration strategy.
+- Modifying the activity detection/event model or the reconciler algorithm.
+- Changing booking, closure, or timeline behavior.
+- Adding state-changing HTTP endpoints or altering security boundaries.
+- Changing the privacy model or what data is captured/stored.
+
 ## Build, test & lint
 
 All standard tasks run through the `Makefile`:
