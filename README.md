@@ -94,9 +94,9 @@ chmod +x zeitspur
 
 Replace `amd64` with `arm64` for ARM systems.
 
-## Installation
+## Install or upgrade
 
-Copy the binary to a convenient location and run the install command:
+Once you have the `zeitspur` binary, run:
 
 ```bash
 ./zeitspur install
@@ -104,12 +104,13 @@ Copy the binary to a convenient location and run the install command:
 
 This will:
 
-1. Copy the binary to `~/.local/bin/zeitspur`.
-2. Write a systemd user unit to `~/.config/systemd/user/zeitspur.service`.
-3. Run `systemctl --user daemon-reload`.
-4. Enable and start the service.
+1. Stop any already running `zeitspur` instance (for upgrades).
+2. Copy the binary to `~/.local/bin/zeitspur`.
+3. Write a systemd user unit to `~/.config/systemd/user/zeitspur.service`.
+4. Run `systemctl --user daemon-reload`.
+5. Enable and start the service.
 
-No root privileges are required.
+No root privileges are required. The same command upgrades an existing installation to a new binary.
 
 ```bash
 systemctl --user status zeitspur
