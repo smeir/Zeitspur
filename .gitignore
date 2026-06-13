@@ -1,4 +1,5 @@
 /zeitspur
+/zeitspur-linux-*
 *.db
 *.db-journal
 *.db-shm

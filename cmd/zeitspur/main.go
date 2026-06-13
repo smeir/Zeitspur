@@ -22,6 +22,9 @@ import (
 	"github.com/smeir/zeitspur/web"
 )
 
+// version is set at link time via -ldflags for release builds.
+var version = "dev"
+
 func main() {
 	if len(os.Args) < 2 {
 		printUsage()
@@ -30,6 +33,8 @@ func main() {
 
 	cmd := os.Args[1]
 	switch cmd {
+	case "version":
+		fmt.Println(version)
 	case "serve":
 		if err := runServe(); err != nil {
 			slog.Error("serve failed", "error", err)
@@ -62,7 +67,7 @@ func main() {
 }
 
 func printUsage() {
-	fmt.Fprintf(os.Stderr, "Usage: zeitspur <serve|status|open|install|uninstall>\n")
+	fmt.Fprintf(os.Stderr, "Usage: zeitspur <serve|status|open|install|uninstall|version>\n")
 }
 
 func setup() (config.Config, config.Paths, *sql.DB, activity.ActivityProvider, error) {
