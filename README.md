@@ -72,11 +72,26 @@ zeitspur/
 make build
 ```
 
-This produces `zeitspur` with:
+This produces `zeitspur` with version injection:
 
 ```bash
-CGO_ENABLED=0 go build -trimpath -o zeitspur ./cmd/zeitspur
+CGO_ENABLED=0 go build -trimpath -ldflags "-X main.version=<version>" -o zeitspur ./cmd/zeitspur
 ```
+
+## Install from release
+
+Pre-built Linux binaries are available on the [releases page](https://github.com/smeir/Zeitspur/releases).
+
+For `amd64`:
+
+```bash
+curl -LO https://github.com/smeir/Zeitspur/releases/latest/download/zeitspur-linux-amd64.tar.gz
+tar -xzf zeitspur-linux-amd64.tar.gz
+chmod +x zeitspur
+sudo mv zeitspur /usr/local/bin/
+```
+
+Replace `amd64` with `arm64` for ARM systems.
 
 ## Installation
 
@@ -114,6 +129,7 @@ zeitspur status    # print current state and today's tracked time
 zeitspur open      # open the local web UI in the default browser
 zeitspur install   # install and enable the systemd user service
 zeitspur uninstall # disable and remove the systemd user service
+zeitspur version   # print the binary version
 ```
 
 The web UI listens on `127.0.0.1:8787` by default.
