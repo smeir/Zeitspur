@@ -47,6 +47,8 @@ func DefaultPaths() (Paths, error) {
 }
 
 // Install copies the binary and enables the user service.
+// If a service is already running, it is stopped first so the binary can be
+// overwritten (fresh installs tolerate the failed stop command).
 func Install(currentBinary string) error {
 	paths, err := DefaultPaths()
 	if err != nil {
@@ -59,6 +61,9 @@ func Install(currentBinary string) error {
 	if err := os.MkdirAll(paths.UnitDir, 0o755); err != nil {
 		return fmt.Errorf("mkdir unit dir: %w", err)
 	}
+
+	// Stop any running instance before overwriting the binary.
+	_ = run("systemctl", "--user", "stop", "zeitspur.service")
 
 	src, err := os.Open(currentBinary)
 	if err != nil {
