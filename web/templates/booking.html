@@ -1,61 +1,61 @@
 {{ define "content" }}
 <div class="card">
-  <h2>Booking Day</h2>
+  <h2>{{ T "BookingDay" }}</h2>
   {{ if .BookingDay }}
-    <p>Current Booking Day: <strong>{{ .BookingDay.Format "2006-01-02" }}</strong></p>
+    <p>{{ T "CurrentBookingDay" }}: <strong>{{ dateShort .BookingDay }}</strong></p>
     {{ if .Overdue }}
-      <p class="changed">Warning: Booking Day has passed and the period is still open.</p>
+      <p class="changed">{{ T "BookingDayOverdue" }}</p>
     {{ else }}
-      <p>{{ .DaysRemaining }} days remaining.</p>
+      <p>{{ Tf "DaysRemaining" (dict "Days" .DaysRemaining) }}</p>
     {{ end }}
     <form action="/booking-day" method="post">
       <input type="hidden" name="csrf_token" value="{{ .CSRFToken }}">
       <input type="hidden" name="action" value="remove">
-      <button type="submit" class="secondary">Remove Booking Day</button>
+      <button type="submit" class="secondary">{{ T "RemoveBookingDay" }}</button>
     </form>
   {{ else }}
-    <p>No Booking Day set.</p>
+    <p>{{ T "NoBookingDaySet" }}</p>
   {{ end }}
 
-  <h3>Set Booking Day</h3>
+  <h3>{{ T "SetBookingDay" }}</h3>
   <form action="/booking-day" method="post">
     <input type="hidden" name="csrf_token" value="{{ .CSRFToken }}">
     <input type="hidden" name="action" value="set">
-    <label>Date <input type="date" name="date" required></label>
-    <button type="submit">Set</button>
+    <label>{{ T "Date" }} <input type="date" name="date" required></label>
+    <button type="submit">{{ T "Set" }}</button>
   </form>
 </div>
 
 {{ if .BookingDay }}
 <div class="card">
-  <h2>Open Booking Period</h2>
-  <p>{{ .PeriodStart }} - {{ .PeriodEnd }}</p>
+  <h2>{{ T "OpenBookingPeriod" }}</h2>
+  <p>{{ dateShort .PeriodStart }} - {{ dateShort .PeriodEnd }}</p>
   <form action="/booking/bulk" method="post">
     <input type="hidden" name="csrf_token" value="{{ .CSRFToken }}">
     <table>
       <thead>
-        <tr><th><input type="checkbox" id="select-all" onclick="document.querySelectorAll('.day-check').forEach(c=>c.checked=this.checked)"></th><th>Day</th><th>Worked</th><th>Status</th><th>Changed</th></tr>
+        <tr><th><input type="checkbox" id="select-all" onclick="document.querySelectorAll('.day-check').forEach(c=>c.checked=this.checked)"></th><th>{{ T "Day" }}</th><th>{{ T "Worked" }}</th><th>{{ T "Status" }}</th><th>{{ T "Changed" }}</th></tr>
       </thead>
       <tbody>
       {{ range .Days }}
         <tr>
           <td><input type="checkbox" class="day-check" name="dates" value="{{ .Date }}"></td>
-          <td>{{ .Date }}</td>
-          <td>{{ .WorkedMinutes }} min</td>
-          <td class="{{ if .Booked }}booked{{ else }}unbooked{{ end }}">{{ if .Booked }}booked{{ else }}unbooked{{ end }}</td>
-          <td>{{ if .ChangedAfterBooking }}yes{{ else }}no{{ end }}</td>
+          <td>{{ dateShort .DateObj }}</td>
+          <td>{{ Tf "WorkedMinutes" (dict "Minutes" .WorkedMinutes) }}</td>
+          <td class="{{ if .Booked }}booked{{ else }}unbooked{{ end }}">{{ bookedLabel .Booked }}</td>
+          <td>{{ yesNo .ChangedAfterBooking }}</td>
         </tr>
       {{ end }}
       </tbody>
     </table>
-    <button type="submit" name="booked" value="true">Mark selected as booked</button>
-    <button type="submit" name="booked" value="false" class="secondary">Mark selected as not booked</button>
+    <button type="submit" name="booked" value="true">{{ T "MarkSelectedBooked" }}</button>
+    <button type="submit" name="booked" value="false" class="secondary">{{ T "MarkSelectedNotBooked" }}</button>
   </form>
 </div>
 
 <div class="card">
-  <h2>Close Period</h2>
-  <a class="btn" href="/booking/close-preview">Preview closure</a>
+  <h2>{{ T "ClosePeriod" }}</h2>
+  <a class="btn" href="/booking/close-preview">{{ T "PreviewClosure" }}</a>
 </div>
 {{ end }}
 {{ end }}

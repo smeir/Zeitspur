@@ -1,5 +1,5 @@
 {{ define "layout" }}<!DOCTYPE html>
-<html lang="en">
+<html lang="{{ .Lang }}">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -10,12 +10,12 @@
 <body>
   <header>
     <nav>
-      <a href="/" class="{{ if eq .Nav "today" }}active{{ end }}">Today</a>
-      <a href="/week" class="{{ if eq .Nav "week" }}active{{ end }}">Week</a>
-      <a href="/month" class="{{ if eq .Nav "month" }}active{{ end }}">Month</a>
-      <a href="/booking" class="{{ if eq .Nav "booking" }}active{{ end }}">Booking</a>
-      <a href="/closures" class="{{ if eq .Nav "closures" }}active{{ end }}">Closures</a>
-      <a href="/settings" class="{{ if eq .Nav "settings" }}active{{ end }}">Settings</a>
+      <a href="/" class="{{ if eq .Nav "today" }}active{{ end }}">{{ T "NavToday" }}</a>
+      <a href="/week" class="{{ if eq .Nav "week" }}active{{ end }}">{{ T "NavWeek" }}</a>
+      <a href="/month" class="{{ if eq .Nav "month" }}active{{ end }}">{{ T "NavMonth" }}</a>
+      <a href="/booking" class="{{ if eq .Nav "booking" }}active{{ end }}">{{ T "NavBooking" }}</a>
+      <a href="/closures" class="{{ if eq .Nav "closures" }}active{{ end }}">{{ T "NavClosures" }}</a>
+      <a href="/settings" class="{{ if eq .Nav "settings" }}active{{ end }}">{{ T "NavSettings" }}</a>
     </nav>
   </header>
   <main>

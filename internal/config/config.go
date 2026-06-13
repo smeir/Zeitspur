@@ -18,6 +18,7 @@ const (
 	DefaultTailCredit    = 30 * time.Second
 	DefaultListenAddress = "127.0.0.1:8787"
 	DefaultTimezone      = "local"
+	DefaultLanguage      = "de"
 )
 
 // Config is the runtime configuration for Zeitspur.
@@ -42,6 +43,7 @@ type ServerConfig struct {
 // AppConfig holds general application settings.
 type AppConfig struct {
 	Timezone string `toml:"timezone"`
+	Language string `toml:"language"`
 }
 
 // Duration helpers after parsing.
@@ -103,6 +105,7 @@ func Load(path string) (Config, error) {
 		},
 		App: AppConfig{
 			Timezone: DefaultTimezone,
+			Language: DefaultLanguage,
 		},
 	}
 
@@ -169,6 +172,9 @@ func (c Config) Validate() error {
 		if _, err := time.LoadLocation(c.App.Timezone); err != nil {
 			return fmt.Errorf("invalid timezone %q: %w", c.App.Timezone, err)
 		}
+	}
+	if c.App.Language != "" && c.App.Language != "de" && c.App.Language != "en" {
+		return fmt.Errorf("invalid language %q: must be 'de' or 'en'", c.App.Language)
 	}
 	return nil
 }

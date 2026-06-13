@@ -1,22 +1,29 @@
 {{ define "content" }}
 <div class="card">
-  <h2>Settings</h2>
+  <h2>{{ T "Settings" }}</h2>
   <form action="/settings" method="post">
     <input type="hidden" name="csrf_token" value="{{ .CSRFToken }}">
-    <label>Poll interval <input type="text" name="poll_interval" value="{{ .Config.Activity.PollInterval }}"></label>
-    <label>Idle threshold <input type="text" name="idle_threshold" value="{{ .Config.Activity.IdleThreshold }}"></label>
-    <label>Tail credit <input type="text" name="tail_credit" value="{{ .Config.Activity.TailCredit }}"></label>
-    <label>Listen address <input type="text" name="listen_address" value="{{ .Config.Server.ListenAddress }}"></label>
-    <label>Timezone
+    <label>{{ T "PollInterval" }} <input type="text" name="poll_interval" value="{{ .Config.Activity.PollInterval }}"></label>
+    <label>{{ T "IdleThreshold" }} <input type="text" name="idle_threshold" value="{{ .Config.Activity.IdleThreshold }}"></label>
+    <label>{{ T "TailCredit" }} <input type="text" name="tail_credit" value="{{ .Config.Activity.TailCredit }}"></label>
+    <label>{{ T "ListenAddress" }} <input type="text" name="listen_address" value="{{ .Config.Server.ListenAddress }}"></label>
+    <label>{{ T "Timezone" }}
       <select name="timezone">
-        <option value="local" {{ if eq .Config.App.Timezone "local" }}selected{{ end }}>Use system timezone</option>
+        <option value="local" {{ if eq .Config.App.Timezone "local" }}selected{{ end }}>{{ T "UseSystemTimezone" }}</option>
         {{ range .Timezones }}
           <option value="{{ . }}" {{ if eq . $.Config.App.Timezone }}selected{{ end }}>{{ . }}</option>
         {{ end }}
       </select>
     </label>
-    <button type="submit">Save</button>
+    <label>{{ T "Language" }}
+      <select name="language">
+        {{ range .Languages }}
+          <option value="{{ . }}" {{ if eq . $.Config.App.Language }}selected{{ end }}>{{ .NativeName }}</option>
+        {{ end }}
+      </select>
+    </label>
+    <button type="submit">{{ T "Save" }}</button>
   </form>
-  <p class="muted">Settings are persisted to {{ .ConfigPath }}</p>
+  <p class="muted">{{ Tf "SettingsPersisted" (dict "Path" .ConfigPath) }}</p>
 </div>
 {{ end }}

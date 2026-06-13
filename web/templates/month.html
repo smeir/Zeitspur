@@ -1,9 +1,9 @@
 {{ define "content" }}
 <div class="card">
-  <h2>{{ .Month.Format "January 2006" }}</h2>
+  <h2>{{ monthYear .Month }}</h2>
   <div style="display:flex;gap:1rem;margin-bottom:1rem;">
-    <a class="btn secondary" href="/month?date={{ .PrevMonth.Format "2006-01-02" }}">Previous</a>
-    <a class="btn secondary" href="/month?date={{ .NextMonth.Format "2006-01-02" }}">Next</a>
+    <a class="btn secondary" href="/month?date={{ .PrevMonth.Format "2006-01-02" }}">{{ T "Previous" }}</a>
+    <a class="btn secondary" href="/month?date={{ .NextMonth.Format "2006-01-02" }}">{{ T "Next" }}</a>
   </div>
   <div class="calendar">
     {{ range .Cells }}

@@ -1,16 +1,16 @@
 {{define "content"}}
 <div class="card">
-  <h2>Close Period Preview</h2>
-  <p>Booking Day: {{.BookingDay}}</p>
-  <p>Period: {{.PeriodStart}} - {{.PeriodEnd}}</p>
-  <p>Tracked workdays: {{.Tracked}}</p>
-  <p>Booked: {{.Booked}} &middot; Unbooked: {{.Unbooked}}</p>
-  <p>Total minutes: {{.TotalMinutes}}</p>
-  {{if .HasUnbookedWarning}}<p class="changed">Warning: {{.UnbookedCount}} unbooked days.</p>{{end}}
+  <h2>{{ T "ClosePeriodPreview" }}</h2>
+  <p>{{ T "BookingDay" }}: {{ dateShort .BookingDay }}</p>
+  <p>{{ T "Period" }}: {{ dateShort .PeriodStart }} - {{ dateShort .PeriodEnd }}</p>
+  <p>{{ T "TrackedWorkdays" }}: {{ .Tracked }}</p>
+  <p>{{ T "Booked" }}: {{ .Booked }} &middot; {{ T "Unbooked" }}: {{ .Unbooked }}</p>
+  <p>{{ T "TotalMinutes" }}: {{ .TotalMinutes }}</p>
+  {{if .HasUnbookedWarning}}<p class="changed">{{ Tf "UnbookedDaysWarning" (dict "Count" .UnbookedCount) }}</p>{{end}}
   <form action="/booking/close" method="post">
     <input type="hidden" name="csrf_token" value="{{.CSRFToken}}">
-    <label><input type="checkbox" name="confirm" value="true" required> I acknowledge that unbooked days remain.</label>
-    <button type="submit">Close booking period</button>
+    <label><input type="checkbox" name="confirm" value="true" required> {{ T "AcknowledgeUnbooked" }}</label>
+    <button type="submit">{{ T "CloseBookingPeriod" }}</button>
   </form>
 </div>
 {{end}}

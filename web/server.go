@@ -8,6 +8,7 @@ import (
 	"database/sql"
 	"embed"
 	"encoding/hex"
+	"errors"
 	"fmt"
 	"html/template"
 	"log/slog"
@@ -20,6 +21,7 @@ import (
 	"github.com/smeir/zeitspur/internal/activity"
 	"github.com/smeir/zeitspur/internal/clock"
 	"github.com/smeir/zeitspur/internal/config"
+	"github.com/smeir/zeitspur/internal/i18n"
 )
 
 //go:embed templates/*.html static/*
@@ -33,7 +35,8 @@ type Server struct {
 	paths     config.Paths
 	provider  activity.ActivityProvider
 	router    chi.Router
-	templates map[string]*template.Template
+	templates map[i18n.Locale]map[string]*template.Template
+	catalog   i18n.Catalog
 	clk       clock.Clock
 	loc       *time.Location
 }
@@ -49,14 +52,19 @@ func NewServer(db *sql.DB, cfg config.Config, paths config.Paths, provider activ
 		}
 	}
 
-	templates := make(map[string]*template.Template)
+	catalog := i18n.NewCatalog()
 	pageNames := []string{"today", "week", "month", "booking", "closures", "closure_detail", "settings", "close_preview"}
-	for _, name := range pageNames {
-		tmpl, err := template.New("").ParseFS(assets, "templates/layout.html", "templates/"+name+".html")
-		if err != nil {
-			return nil, fmt.Errorf("parse template %s: %w", name, err)
+	templates := make(map[i18n.Locale]map[string]*template.Template)
+	for _, locale := range i18n.SupportedLocales() {
+		templates[locale] = make(map[string]*template.Template)
+		funcs := templateFuncs(catalog, locale)
+		for _, name := range pageNames {
+			tmpl, err := template.New("").Funcs(funcs).ParseFS(assets, "templates/layout.html", "templates/"+name+".html")
+			if err != nil {
+				return nil, fmt.Errorf("parse template %s/%s: %w", locale, name, err)
+			}
+			templates[locale][name] = tmpl
 		}
-		templates[name] = tmpl
 	}
 
 	s := &Server{
@@ -65,6 +73,7 @@ func NewServer(db *sql.DB, cfg config.Config, paths config.Paths, provider activ
 		paths:     paths,
 		provider:  provider,
 		templates: templates,
+		catalog:   catalog,
 		clk:       clk,
 		loc:       loc,
 	}
@@ -133,6 +142,13 @@ func (s *Server) setConfig(cfg config.Config, loc *time.Location) {
 	s.loc = loc
 }
 
+// locale returns the configured locale, defaulting to German.
+func (s *Server) locale() i18n.Locale {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	return i18n.ParseLocale(s.cfg.App.Language)
+}
+
 func (s *Server) handleStatic(w http.ResponseWriter, r *http.Request) {
 	http.FileServer(http.FS(assets)).ServeHTTP(w, r)
 }
@@ -178,15 +194,19 @@ func csrfToken(r *http.Request) string {
 }
 
 func (s *Server) render(w http.ResponseWriter, r *http.Request, name string, data map[string]any, status int) {
+	locale := s.locale()
 	data["CSRFToken"] = csrfToken(r)
-	tmpl, ok := s.templates[name]
+	data["Lang"] = string(locale)
+	data["Locale"] = locale
+	setTranslatedTitles(data, s.catalog, locale)
+	page, ok := s.templates[locale][name]
 	if !ok {
-		slog.Error("unknown template", "name", name)
+		slog.Error("unknown template", "name", name, "locale", locale)
 		http.Error(w, "template not found", http.StatusInternalServerError)
 		return
 	}
 	var buf bytes.Buffer
-	if err := tmpl.ExecuteTemplate(&buf, "content", data); err != nil {
+	if err := page.ExecuteTemplate(&buf, "content", data); err != nil {
 		slog.Error("template render failed", "error", err)
 		http.Error(w, "template render failed", http.StatusInternalServerError)
 		return
@@ -196,19 +216,93 @@ func (s *Server) render(w http.ResponseWriter, r *http.Request, name string, dat
 }
 
 func (s *Server) renderLayout(w http.ResponseWriter, r *http.Request, name string, data map[string]any, status int) {
+	locale := s.locale()
 	data["CSRFToken"] = csrfToken(r)
-	tmpl, ok := s.templates[name]
+	data["Lang"] = string(locale)
+	data["Locale"] = locale
+	setTranslatedTitles(data, s.catalog, locale)
+	page, ok := s.templates[locale][name]
 	if !ok {
-		slog.Error("unknown template", "name", name)
+		slog.Error("unknown template", "name", name, "locale", locale)
 		http.Error(w, "template not found", http.StatusInternalServerError)
 		return
 	}
 	var buf bytes.Buffer
-	if err := tmpl.ExecuteTemplate(&buf, "layout", data); err != nil {
+	if err := page.ExecuteTemplate(&buf, "layout", data); err != nil {
 		slog.Error("layout render failed", "error", err)
 		http.Error(w, "layout render failed", http.StatusInternalServerError)
 		return
 	}
 	w.WriteHeader(status)
 	_, _ = buf.WriteTo(w)
+}
+
+// setTranslatedTitles converts raw title strings to translated text when the
+// template data contains a known title key.
+func setTranslatedTitles(data map[string]any, catalog i18n.Catalog, locale i18n.Locale) {
+	if title, ok := data["Title"].(string); ok && title != "" {
+		data["Title"] = catalog.T(locale, title)
+	}
+}
+
+// templateFuncs returns the helper functions available inside templates.
+func templateFuncs(catalog i18n.Catalog, locale i18n.Locale) template.FuncMap {
+	return template.FuncMap{
+		"dict": func(values ...any) (map[string]any, error) {
+			if len(values)%2 != 0 {
+				return nil, errors.New("dict expects an even number of arguments")
+			}
+			d := make(map[string]any, len(values)/2)
+			for i := 0; i < len(values); i += 2 {
+				key, ok := values[i].(string)
+				if !ok {
+					return nil, errors.New("dict keys must be strings")
+				}
+				d[key] = values[i+1]
+			}
+			return d, nil
+		},
+		"T": func(key string) string {
+			return catalog.T(locale, key)
+		},
+		"Tf": func(key string, vars map[string]any) string {
+			return catalog.Tf(locale, key, vars)
+		},
+		"statusLabel": func(status string) string {
+			return catalog.StatusLabel(locale, status)
+		},
+		"sourceLabel": func(source string) string {
+			return catalog.SourceLabel(locale, source)
+		},
+		"dateShort": func(t time.Time) string {
+			return i18n.DateShort(t, locale)
+		},
+		"dateLong": func(t time.Time) string {
+			return i18n.DateLong(t, locale)
+		},
+		"dateTime": func(t time.Time) string {
+			return i18n.DateTime(t, locale)
+		},
+		"monthYear": func(t time.Time) string {
+			return i18n.MonthYear(t, locale)
+		},
+		"weekday": func(t time.Time) string {
+			return i18n.WeekdayName(t, locale)
+		},
+		"month": func(t time.Time) string {
+			return i18n.MonthName(t, locale)
+		},
+		"yesNo": func(v bool) string {
+			if v {
+				return catalog.T(locale, "Yes")
+			}
+			return catalog.T(locale, "No")
+		},
+		"bookedLabel": func(v bool) string {
+			if v {
+				return catalog.T(locale, "Booked")
+			}
+			return catalog.T(locale, "NotBooked")
+		},
+	}
 }

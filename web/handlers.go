@@ -15,6 +15,7 @@ import (
 	"github.com/smeir/zeitspur/internal/booking"
 	"github.com/smeir/zeitspur/internal/closure"
 	"github.com/smeir/zeitspur/internal/config"
+	"github.com/smeir/zeitspur/internal/i18n"
 	"github.com/smeir/zeitspur/internal/timeline"
 )
 
@@ -31,12 +32,14 @@ func (s *Server) handleTodayStatus(w http.ResponseWriter, r *http.Request) {
 
 func (s *Server) handleDay(w http.ResponseWriter, r *http.Request) {
 	date := chi.URLParam(r, "date")
-	if _, err := time.Parse("2006-01-02", date); err != nil {
+	dateObj, err := time.Parse("2006-01-02", date)
+	if err != nil {
 		http.Error(w, "invalid date", http.StatusBadRequest)
 		return
 	}
 	d := s.dayData(r, date)
-	d["Title"] = "Day " + date
+	d["DateObj"] = dateObj
+	d["Title"] = "PageDay"
 	d["Nav"] = "today"
 	s.renderLayout(w, r, "today", d, http.StatusOK)
 }
@@ -60,8 +63,11 @@ func (s *Server) dayData(r *http.Request, date string) map[string]any {
 	blocks, _ := s.blocksForDay(ctx, date)
 	running, runningMinutes := s.currentBlock(ctx, date)
 
+	dateObj, _ := time.Parse("2006-01-02", date)
+
 	return map[string]any{
 		"Date":                date,
+		"DateObj":             dateObj,
 		"Status":              string(state),
 		"CurrentBlockStart":   running,
 		"RunningMinutes":      runningMinutes,
@@ -248,7 +254,7 @@ func (s *Server) handleWeek(w http.ResponseWriter, r *http.Request) {
 	}
 
 	s.renderLayout(w, r, "week", map[string]any{
-		"Title":        "Week",
+		"Title":        "PageWeek",
 		"Nav":          "week",
 		"WeekStart":    start,
 		"WeekEnd":      end,
@@ -324,7 +330,7 @@ func (s *Server) handleMonth(w http.ResponseWriter, r *http.Request) {
 	}
 
 	s.renderLayout(w, r, "month", map[string]any{
-		"Title":     "Month",
+		"Title":     "PageMonth",
 		"Nav":       "month",
 		"Month":     monthStart,
 		"PrevMonth": monthStart.AddDate(0, -1, 0),
@@ -339,7 +345,7 @@ func (s *Server) handleBooking(w http.ResponseWriter, r *http.Request) {
 	bookingDay, _ := br.GetBookingDay(ctx)
 
 	data := map[string]any{
-		"Title": "Booking",
+		"Title": "PageBooking",
 		"Nav":   "booking",
 	}
 
@@ -355,8 +361,8 @@ func (s *Server) handleBooking(w http.ResponseWriter, r *http.Request) {
 		}
 		periodStartStr := periodStart.Format("2006-01-02")
 		periodEndStr := bookingDay.Format("2006-01-02")
-		data["PeriodStart"] = periodStartStr
-		data["PeriodEnd"] = periodEndStr
+		data["PeriodStart"] = periodStart
+		data["PeriodEnd"] = bookingDay
 
 		tsvc := timeline.NewService(s.db)
 		days, _ := tsvc.Range(ctx, periodStartStr, periodEndStr)
@@ -442,9 +448,9 @@ func (s *Server) handleClosePreview(w http.ResponseWriter, r *http.Request) {
 	}
 
 	s.render(w, r, "close_preview", map[string]any{
-		"BookingDay":         bookingDay.Format("2006-01-02"),
-		"PeriodStart":        periodStartStr,
-		"PeriodEnd":          periodEndStr,
+		"BookingDay":         bookingDay,
+		"PeriodStart":        periodStart,
+		"PeriodEnd":          bookingDay,
 		"Tracked":            tracked,
 		"Booked":             booked,
 		"Unbooked":           unbooked,
@@ -536,7 +542,7 @@ func (s *Server) handleClosures(w http.ResponseWriter, r *http.Request) {
 	}
 
 	s.renderLayout(w, r, "closures", map[string]any{
-		"Title":    "Closures",
+		"Title":    "PageClosures",
 		"Nav":      "closures",
 		"Closures": views,
 	}, http.StatusOK)
@@ -557,7 +563,7 @@ func (s *Server) handleClosureDetail(w http.ResponseWriter, r *http.Request) {
 	differs, _ := cr.HasDifferenceSinceClosure(r.Context(), c.ID, statuses)
 
 	s.renderLayout(w, r, "closure_detail", map[string]any{
-		"Title":   "Closure Detail",
+		"Title":   "PageClosureDetail",
 		"Nav":     "closures",
 		"Closure": c,
 		"Differs": differs,
@@ -566,11 +572,12 @@ func (s *Server) handleClosureDetail(w http.ResponseWriter, r *http.Request) {
 
 func (s *Server) handleSettings(w http.ResponseWriter, r *http.Request) {
 	s.renderLayout(w, r, "settings", map[string]any{
-		"Title":      "Settings",
+		"Title":      "PageSettings",
 		"Nav":        "settings",
 		"Config":     s.config(),
 		"ConfigPath": s.paths.ConfigFile,
 		"Timezones":  []string{"UTC", "Europe/Berlin", "Europe/London", "America/New_York", "America/Los_Angeles", "Asia/Tokyo"},
+		"Languages":  []i18n.Locale{i18n.German, i18n.English},
 	}, http.StatusOK)
 }
 
@@ -583,6 +590,7 @@ func (s *Server) handleSettingsSave(w http.ResponseWriter, r *http.Request) {
 	cfg.Activity.TailCredit = r.FormValue("tail_credit")
 	cfg.Server.ListenAddress = r.FormValue("listen_address")
 	cfg.App.Timezone = r.FormValue("timezone")
+	cfg.App.Language = r.FormValue("language")
 
 	if err := config.Write(s.paths.ConfigFile, cfg); err != nil {
 		slog.Error("write config failed", "error", err)

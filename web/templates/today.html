@@ -1,38 +1,38 @@
 {{ define "content" }}
 <div class="card" hx-get="/today/status" hx-trigger="every 10s" hx-swap="outerHTML">
-  <h2>Today - {{ .Date }}</h2>
+  <h2>{{ Tf "TodayDate" (dict "Date" (dateShort .DateObj)) }}</h2>
   <p>
-    Status:
-    <span class="status-badge status-{{ .Status }}">{{ .Status }}</span>
+    {{ T "Status" }}:
+    <span class="status-badge status-{{ .Status }}">{{ statusLabel .Status }}</span>
   </p>
   {{ if .CurrentBlockStart }}
-    <p>Current block started at {{ .CurrentBlockStart.Format "15:04" }} ({{ .RunningMinutes }} min so far)</p>
+    <p>{{ Tf "CurrentBlockStarted" (dict "Time" (.CurrentBlockStart.Format "15:04") "Minutes" .RunningMinutes) }}</p>
   {{ end }}
-  <p>Worked: {{ .WorkedMinutes }} min (incl. running block) &middot; Pause: {{ .PauseMinutes }} min</p>
-  <p>Booking: <span class="{{ if .Booked }}booked{{ else }}unbooked{{ end }}">{{ if .Booked }}booked{{ else }}not booked{{ end }}</span></p>
+  <p>{{ T "Worked" }}: {{ Tf "WorkedMinutes" (dict "Minutes" .WorkedMinutes) }} &middot; {{ T "Pause" }}: {{ Tf "PauseMinutes" (dict "Minutes" .PauseMinutes) }}</p>
+  <p>{{ T "Booking" }}: <span class="{{ if .Booked }}booked{{ else }}unbooked{{ end }}">{{ bookedLabel .Booked }}</span></p>
   {{ if .ChangedAfterBooking }}
-    <p class="changed">Warning: this day was changed after booking.</p>
+    <p class="changed">{{ T "ChangedAfterBooking" }}</p>
   {{ end }}
 </div>
 
 <div class="card">
-  <h3>Work blocks</h3>
+  <h3>{{ T "WorkBlocks" }}</h3>
   {{ if .Blocks }}
   <table>
     <thead>
-      <tr><th>Start</th><th>End</th><th>Source</th><th>Note</th><th>Actions</th></tr>
+      <tr><th>{{ T "Start" }}</th><th>{{ T "End" }}</th><th>{{ T "Source" }}</th><th>{{ T "Note" }}</th><th>{{ T "Actions" }}</th></tr>
     </thead>
     <tbody>
     {{ range .Blocks }}
       <tr>
         <td>{{ .Start.Format "15:04" }}</td>
         <td>{{ .End.Format "15:04" }}</td>
-        <td>{{ .Source }}</td>
+        <td>{{ sourceLabel .Source }}</td>
         <td>{{ .Note }}</td>
         <td>
           <form class="inline" action="/day/{{ .Date }}/block/{{ .ID }}/ignore" method="post">
             <input type="hidden" name="csrf_token" value="{{ $.CSRFToken }}">
-            <button type="submit" class="secondary">Ignore</button>
+            <button type="submit" class="secondary">{{ T "Ignore" }}</button>
           </form>
         </td>
       </tr>
@@ -40,29 +40,29 @@
     </tbody>
   </table>
   {{ else }}
-    <p>No work blocks recorded yet.</p>
+    <p>{{ T "NoWorkBlocks" }}</p>
   {{ end }}
-  <h4>Add manual block</h4>
+  <h4>{{ T "AddManualBlock" }}</h4>
   <form action="/day/{{ .Date }}/block" method="post">
     <input type="hidden" name="csrf_token" value="{{ .CSRFToken }}">
-    <label>Start <input type="time" name="start" required></label>
-    <label>End <input type="time" name="end" required></label>
-    <label>Note <input type="text" name="note"></label>
-    <button type="submit">Add</button>
+    <label>{{ T "Start" }} <input type="time" name="start" required></label>
+    <label>{{ T "End" }} <input type="time" name="end" required></label>
+    <label>{{ T "Note" }} <input type="text" name="note"></label>
+    <button type="submit">{{ T "Add" }}</button>
   </form>
 </div>
 
 <div class="card">
-  <h3>Booking</h3>
+  <h3>{{ T "Booking" }}</h3>
   <form class="inline" action="/day/{{ .Date }}/book" method="post">
     <input type="hidden" name="csrf_token" value="{{ .CSRFToken }}">
     <input type="hidden" name="booked" value="true">
-    <button type="submit">Mark day as booked</button>
+    <button type="submit">{{ T "MarkDayBooked" }}</button>
   </form>
   <form class="inline" action="/day/{{ .Date }}/book" method="post">
     <input type="hidden" name="csrf_token" value="{{ .CSRFToken }}">
     <input type="hidden" name="booked" value="false">
-    <button type="submit" class="secondary">Mark day as not booked</button>
+    <button type="submit" class="secondary">{{ T "MarkDayNotBooked" }}</button>
   </form>
 </div>
 {{ end }}

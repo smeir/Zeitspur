@@ -11,6 +11,7 @@ import (
 // DaySummary represents the aggregated data for a single calendar day.
 type DaySummary struct {
 	Date                string
+	DateObj             time.Time
 	WorkedMinutes       int
 	PauseMinutes        int
 	TotalMinutes        int
@@ -38,7 +39,8 @@ func (s *Service) Day(ctx context.Context, date string) (*DaySummary, error) {
 		return nil, err
 	}
 	if len(list) == 0 {
-		return &DaySummary{Date: date}, nil
+		dateObj, _ := time.Parse("2006-01-02", date)
+		return &DaySummary{Date: date, DateObj: dateObj}, nil
 	}
 	return list[0], nil
 }
@@ -67,6 +69,7 @@ func (s *Service) summarize(ctx context.Context, start, end string) ([]*DaySumma
 		if err := rows.Scan(&ds.Date, &ds.Booked, &ds.BookingRevision, &ds.CurrentRevision); err != nil {
 			return nil, err
 		}
+		ds.DateObj, _ = time.Parse("2006-01-02", ds.Date)
 		statusByDate[ds.Date] = &ds
 	}
 	if err := rows.Err(); err != nil {
@@ -110,7 +113,8 @@ func (s *Service) summarize(ctx context.Context, start, end string) ([]*DaySumma
 	// Ensure all block dates exist in statusByDate.
 	for _, b := range blocks {
 		if _, ok := statusByDate[b.date]; !ok {
-			statusByDate[b.date] = &DaySummary{Date: b.date}
+			dateObj, _ := time.Parse("2006-01-02", b.date)
+			statusByDate[b.date] = &DaySummary{Date: b.date, DateObj: dateObj}
 		}
 	}
 

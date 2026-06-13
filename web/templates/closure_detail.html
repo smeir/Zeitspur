@@ -1,28 +1,28 @@
 {{ define "content" }}
 <div class="card">
-  <h2>Closure #{{ .Closure.ID }}</h2>
-  <p>Period: <strong>{{ .Closure.PeriodStart }} - {{ .Closure.PeriodEnd }}</strong></p>
-  <p>Booking Day: {{ .Closure.BookingDay }}</p>
-  <p>Closed at: {{ .Closure.ClosedAt.Format "2006-01-02 15:04" }}</p>
-  <p>Tracked workdays: {{ .Closure.TrackedWorkdayCount }}</p>
-  <p>Booked: {{ .Closure.BookedWorkdayCount }} &middot; Unbooked: {{ .Closure.UnbookedWorkdayCount }}</p>
-  <p>Total minutes: {{ .Closure.TrackedMinutesSnapshot }}</p>
+  <h2>{{ T "Closure" }} #{{ .Closure.ID }}</h2>
+  <p>{{ T "Period" }}: <strong>{{ dateShort .Closure.PeriodStartObj }} - {{ dateShort .Closure.PeriodEndObj }}</strong></p>
+  <p>{{ T "BookingDay" }}: {{ dateShort .Closure.BookingDayObj }}</p>
+  <p>{{ T "ClosedAt" }}: {{ dateTime .Closure.ClosedAt }}</p>
+  <p>{{ T "TrackedWorkdays" }}: {{ .Closure.TrackedWorkdayCount }}</p>
+  <p>{{ T "Booked" }}: {{ .Closure.BookedWorkdayCount }} &middot; {{ T "Unbooked" }}: {{ .Closure.UnbookedWorkdayCount }}</p>
+  <p>{{ T "TotalMinutes" }}: {{ .Closure.TrackedMinutesSnapshot }}</p>
   {{ if .Differs }}
-    <p class="changed">Current data differs from this snapshot.</p>
+    <p class="changed">{{ T "CurrentDataDiffers" }}</p>
   {{ end }}
 </div>
 
 <div class="card">
-  <h3>Day snapshot</h3>
+  <h3>{{ T "DaySnapshot" }}</h3>
   <table>
     <thead>
-      <tr><th>Date</th><th>Booked</th><th>Tracked minutes</th></tr>
+      <tr><th>{{ T "Date" }}</th><th>{{ T "Booked" }}</th><th>{{ T "TrackedMinutes" }}</th></tr>
     </thead>
     <tbody>
     {{ range .Closure.Days }}
       <tr>
-        <td>{{ .WorkDate }}</td>
-        <td>{{ if .BookedSnapshot }}yes{{ else }}no{{ end }}</td>
+        <td>{{ dateShort .DateObj }}</td>
+        <td>{{ yesNo .BookedSnapshot }}</td>
         <td>{{ .TrackedMinutes }}</td>
       </tr>
     {{ end }}

@@ -16,6 +16,9 @@ type Closure struct {
 	PeriodStart            string
 	PeriodEnd              string
 	BookingDay             string
+	PeriodStartObj         time.Time
+	PeriodEndObj           time.Time
+	BookingDayObj          time.Time
 	ClosedAt               time.Time
 	TrackedWorkdayCount    int
 	BookedWorkdayCount     int
@@ -29,6 +32,7 @@ type ClosureDay struct {
 	ID                  int
 	ClosureID           int
 	WorkDate            string
+	DateObj             time.Time
 	BookedSnapshot      bool
 	TrackedMinutes      int
 	DayRevisionSnapshot int
@@ -290,6 +294,9 @@ func (r *Repository) scanClosure(row interface{ Scan(...any) error }) (*Closure,
 		return nil, err
 	}
 	c.ClosedAt, _ = time.Parse(time.RFC3339Nano, closedAt)
+	c.PeriodStartObj, _ = time.Parse("2006-01-02", c.PeriodStart)
+	c.PeriodEndObj, _ = time.Parse("2006-01-02", c.PeriodEnd)
+	c.BookingDayObj, _ = time.Parse("2006-01-02", c.BookingDay)
 	return &c, nil
 }
 
@@ -311,6 +318,7 @@ func (r *Repository) listDays(ctx context.Context, closureID int) ([]ClosureDay,
 		if err := rows.Scan(&d.ID, &d.ClosureID, &d.WorkDate, &d.BookedSnapshot, &d.TrackedMinutes, &d.DayRevisionSnapshot); err != nil {
 			return nil, err
 		}
+		d.DateObj, _ = time.Parse("2006-01-02", d.WorkDate)
 		days = append(days, d)
 	}
 	return days, rows.Err()

@@ -1,20 +1,20 @@
 {{ define "content" }}
 <div class="card">
-  <h2>Week {{ .WeekStart.Format "2006-01-02" }} - {{ .WeekEnd.Format "2006-01-02" }}</h2>
-  <p>Total tracked: {{ .TotalMinutes }} min &middot; Booked days: {{ .BookedDays }} &middot; Unbooked days: {{ .UnbookedDays }}</p>
+  <h2>{{ Tf "WeekRange" (dict "Start" (dateShort .WeekStart) "End" (dateShort .WeekEnd)) }}</h2>
+  <p>{{ T "TotalTracked" }}: {{ Tf "WorkedMinutes" (dict "Minutes" .TotalMinutes) }} &middot; {{ T "BookedDays" }}: {{ .BookedDays }} &middot; {{ T "UnbookedDays" }}: {{ .UnbookedDays }}</p>
   <table>
     <thead>
-      <tr><th>Day</th><th>Worked</th><th>Pause</th><th>Status</th><th>Blocks</th><th>Changed</th></tr>
+      <tr><th>{{ T "Day" }}</th><th>{{ T "Worked" }}</th><th>{{ T "Pause" }}</th><th>{{ T "Status" }}</th><th>{{ T "Blocks" }}</th><th>{{ T "Changed" }}</th></tr>
     </thead>
     <tbody>
     {{ range .Days }}
       <tr>
-        <td><a href="/day/{{ .Date }}">{{ .Date }}</a></td>
-        <td>{{ .WorkedMinutes }} min</td>
-        <td>{{ .PauseMinutes }} min</td>
-        <td class="{{ if .Booked }}booked{{ else }}unbooked{{ end }}">{{ if .Booked }}booked{{ else }}unbooked{{ end }}</td>
+        <td><a href="/day/{{ .Date }}">{{ dateShort .DateObj }}</a></td>
+        <td>{{ Tf "WorkedMinutes" (dict "Minutes" .WorkedMinutes) }}</td>
+        <td>{{ Tf "PauseMinutes" (dict "Minutes" .PauseMinutes) }}</td>
+        <td class="{{ if .Booked }}booked{{ else }}unbooked{{ end }}">{{ bookedLabel .Booked }}</td>
         <td>{{ .BlockCount }}</td>
-        <td>{{ if .ChangedAfterBooking }}yes{{ else }}no{{ end }}</td>
+        <td>{{ yesNo .ChangedAfterBooking }}</td>
       </tr>
     {{ end }}
     </tbody>
