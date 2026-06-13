@@ -29,7 +29,7 @@ func newTestServer(t *testing.T) (*Server, *sql.DB) {
 	cfg.App.Timezone = "local"
 	paths := config.Paths{ConfigFile: t.TempDir() + "/config.toml"}
 	provider := activity.NewMockProvider(activity.ActivityActive)
-	srv, err := NewServer(db, cfg, paths, provider, clock.System{})
+	srv, err := NewServer(db, cfg, paths, provider, clock.System{}, "test")
 	if err != nil {
 		t.Fatalf("new server: %v", err)
 	}
@@ -130,7 +130,7 @@ func TestServer_EnglishDayView(t *testing.T) {
 		t.Fatalf("migrate: %v", err)
 	}
 	provider := activity.NewMockProvider(activity.ActivityActive)
-	srv, err := NewServer(db, cfg, paths, provider, clock.System{})
+	srv, err := NewServer(db, cfg, paths, provider, clock.System{}, "test")
 	if err != nil {
 		t.Fatalf("new server: %v", err)
 	}

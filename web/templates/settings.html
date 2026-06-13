@@ -25,5 +25,6 @@
     <button type="submit">{{ T "Save" }}</button>
   </form>
   <p class="muted">{{ Tf "SettingsPersisted" (dict "Path" .ConfigPath) }}</p>
+  <p class="muted">{{ T "Version" }} {{ .Version }}</p>
 </div>
 {{ end }}

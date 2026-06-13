@@ -39,10 +39,11 @@ type Server struct {
 	catalog   i18n.Catalog
 	clk       clock.Clock
 	loc       *time.Location
+	version   string
 }
 
 // NewServer creates and configures the web server.
-func NewServer(db *sql.DB, cfg config.Config, paths config.Paths, provider activity.ActivityProvider, clk clock.Clock) (*Server, error) {
+func NewServer(db *sql.DB, cfg config.Config, paths config.Paths, provider activity.ActivityProvider, clk clock.Clock, version string) (*Server, error) {
 	loc := time.Local
 	if cfg.App.Timezone != "" && cfg.App.Timezone != "local" {
 		var err error
@@ -76,6 +77,7 @@ func NewServer(db *sql.DB, cfg config.Config, paths config.Paths, provider activ
 		catalog:   catalog,
 		clk:       clk,
 		loc:       loc,
+		version:   version,
 	}
 
 	r := chi.NewRouter()

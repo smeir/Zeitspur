@@ -133,7 +133,7 @@ func runServe() error {
 		}
 	}()
 
-	server, err := web.NewServer(db, cfg, paths, provider, clk)
+	server, err := web.NewServer(db, cfg, paths, provider, clk, version)
 	if err != nil {
 		return err
 	}

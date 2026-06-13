@@ -147,6 +147,7 @@ func NewCatalog() Catalog {
 			"UseSystemTimezone": "Systemzeitzone verwenden",
 			"Language":          "Sprache",
 			"Save":              "Speichern",
+			"Version":           "Version",
 			"SettingsPersisted": "Einstellungen werden gespeichert in {{.Path}}",
 		},
 		English: {
@@ -269,6 +270,7 @@ func NewCatalog() Catalog {
 			"UseSystemTimezone": "Use system timezone",
 			"Language":          "Language",
 			"Save":              "Save",
+			"Version":           "Version",
 			"SettingsPersisted": "Settings are persisted to {{.Path}}",
 		},
 	}

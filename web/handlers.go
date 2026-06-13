@@ -578,6 +578,7 @@ func (s *Server) handleSettings(w http.ResponseWriter, r *http.Request) {
 		"ConfigPath": s.paths.ConfigFile,
 		"Timezones":  []string{"UTC", "Europe/Berlin", "Europe/London", "America/New_York", "America/Los_Angeles", "Asia/Tokyo"},
 		"Languages":  []i18n.Locale{i18n.German, i18n.English},
+		"Version":    s.version,
 	}, http.StatusOK)
 }
 
