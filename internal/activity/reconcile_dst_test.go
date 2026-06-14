@@ -25,7 +25,7 @@ func TestReconciler_DaylightSavingTransition(t *testing.T) {
 	insertEvent(t, db, start, EventActive)
 	insertEvent(t, db, end, EventIdle)
 
-	rec := NewReconciler(db, clock.System{}, 30*time.Second)
+	rec := NewReconciler(db, clock.System{})
 	if err := rec.RebuildDay(context.Background(), loc, day); err != nil {
 		t.Fatalf("rebuild: %v", err)
 	}
@@ -44,8 +44,7 @@ func TestReconciler_DaylightSavingTransition(t *testing.T) {
 	}
 	s0, _ := time.Parse(time.RFC3339Nano, startedAt)
 	e0, _ := time.Parse(time.RFC3339Nano, endedAt)
-	expectedEnd := end.Add(30 * time.Second) // tail credit
-	if !s0.Equal(start) || !e0.Equal(expectedEnd) {
-		t.Fatalf("block times do not match: %v - %v (expected %v)", s0, e0, expectedEnd)
+	if !s0.Equal(start) || !e0.Equal(end) {
+		t.Fatalf("block times do not match: %v - %v (expected %v)", s0, e0, end)
 	}
 }

@@ -17,7 +17,6 @@ type Engine struct {
 	clock         clock.Clock
 	reconciler    *Reconciler
 	idleThreshold time.Duration
-	tailCredit    time.Duration
 	pollInterval  time.Duration
 
 	lastState    ActivityState
@@ -25,16 +24,46 @@ type Engine struct {
 }
 
 // NewEngine creates a new activity engine.
-func NewEngine(db *sql.DB, provider ActivityProvider, clk clock.Clock, idleThreshold, tailCredit, pollInterval time.Duration) *Engine {
-	return &Engine{
+func NewEngine(db *sql.DB, provider ActivityProvider, clk clock.Clock, idleThreshold, pollInterval time.Duration) *Engine {
+	e := &Engine{
 		db:            db,
 		provider:      provider,
 		clock:         clk,
-		reconciler:    NewReconciler(db, clk, tailCredit),
+		reconciler:    NewReconciler(db, clk),
 		idleThreshold: idleThreshold,
-		tailCredit:    tailCredit,
 		pollInterval:  pollInterval,
 		lastState:     ActivityUnknown,
+	}
+	e.restoreState(context.Background())
+	return e
+}
+
+// restoreState loads the most recent event so the engine avoids inserting
+// redundant active events after a restart.
+func (e *Engine) restoreState(ctx context.Context) {
+	var typ, ts string
+	row := e.db.QueryRowContext(ctx, `
+		SELECT event_type, occurred_at FROM activity_events
+		ORDER BY occurred_at DESC, id DESC
+		LIMIT 1
+	`)
+	if err := row.Scan(&typ, &ts); err != nil {
+		return
+	}
+	occurredAt, err := time.Parse(time.RFC3339Nano, ts)
+	if err != nil {
+		return
+	}
+	switch EventType(typ) {
+	case EventActive, EventUnlocked, EventResume:
+		e.lastState = ActivityActive
+		e.lastActiveAt = occurredAt
+	case EventIdle:
+		e.lastState = ActivityIdle
+	case EventLocked:
+		e.lastState = ActivityLocked
+	case EventSuspend:
+		e.lastState = ActivitySuspended
 	}
 }
 
@@ -88,9 +117,11 @@ func (e *Engine) tick(ctx context.Context) error {
 			if err := e.insertEvent(ctx, eventType, nil); err != nil {
 				return err
 			}
-			e.reconcileCurrentDay(ctx, now)
 			e.lastState = ActivityActive
 		}
+		// Reconcile on every tick while active so the open block is visible
+		// even when no state change occurs.
+		e.reconcileCurrentDay(ctx, now)
 	case ActivityIdle:
 		if e.lastState == ActivityActive || e.lastState == ActivityUnknown {
 			if now.Sub(e.lastActiveAt) >= e.idleThreshold {

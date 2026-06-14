@@ -29,7 +29,7 @@ func TestReconciler_BuildsBlocks(t *testing.T) {
 	insertEvent(t, db, day.Add(8*time.Hour), EventActive)
 	insertEvent(t, db, day.Add(10*time.Hour), EventIdle)
 
-	rec := NewReconciler(db, clock.System{}, 30*time.Second)
+	rec := NewReconciler(db, clock.System{})
 	if err := rec.RebuildDay(context.Background(), loc, day); err != nil {
 		t.Fatalf("rebuild: %v", err)
 	}
@@ -52,7 +52,7 @@ func TestReconciler_SplitsAtMidnight(t *testing.T) {
 	insertEvent(t, db, start, EventActive)
 	insertEvent(t, db, start.Add(5*time.Hour), EventIdle)
 
-	rec := NewReconciler(db, clock.System{}, 30*time.Second)
+	rec := NewReconciler(db, clock.System{})
 	if err := rec.RebuildDay(context.Background(), loc, start); err != nil {
 		t.Fatalf("rebuild first day: %v", err)
 	}
@@ -69,16 +69,16 @@ func TestReconciler_SplitsAtMidnight(t *testing.T) {
 	}
 }
 
-func TestReconciler_TailCredit(t *testing.T) {
+func TestReconciler_OpenBlockEndsAtNow(t *testing.T) {
 	db := newTestDB(t)
 	defer db.Close()
 
 	loc := time.UTC
 	day := time.Date(2026, 6, 13, 0, 0, 0, 0, loc)
 	insertEvent(t, db, day.Add(8*time.Hour), EventActive)
-	insertEvent(t, db, day.Add(8*time.Hour+3*time.Minute), EventIdle)
 
-	rec := NewReconciler(db, clock.System{}, 30*time.Second)
+	now := day.Add(10*time.Hour + 15*time.Minute)
+	rec := NewReconciler(db, clock.NewFixed(now))
 	if err := rec.RebuildDay(context.Background(), loc, day); err != nil {
 		t.Fatalf("rebuild: %v", err)
 	}
@@ -88,8 +88,101 @@ func TestReconciler_TailCredit(t *testing.T) {
 		t.Fatalf("select end: %v", err)
 	}
 	end, _ := time.Parse(time.RFC3339Nano, endStr)
-	expected := day.Add(8*time.Hour + 3*time.Minute + 30*time.Second)
-	if !end.Equal(expected) {
-		t.Fatalf("expected end %v, got %v", expected, end)
+	if !end.Equal(now) {
+		t.Fatalf("expected open block to end at %v, got %v", now, end)
+	}
+}
+
+func TestReconciler_IgnoredBlockNotRecreated(t *testing.T) {
+	db := newTestDB(t)
+	defer db.Close()
+
+	loc := time.UTC
+	day := time.Date(2026, 6, 13, 0, 0, 0, 0, loc)
+	start := day.Add(8 * time.Hour)
+	end := day.Add(10 * time.Hour)
+	insertEvent(t, db, start, EventActive)
+	insertEvent(t, db, end, EventIdle)
+
+	// First reconcile creates the detected block.
+	rec := NewReconciler(db, clock.System{})
+	if err := rec.RebuildDay(context.Background(), loc, day); err != nil {
+		t.Fatalf("rebuild: %v", err)
+	}
+
+	// Mark the block as ignored.
+	if _, err := db.ExecContext(context.Background(), `
+		UPDATE work_blocks SET status = 'ignored', updated_at = ?
+		WHERE work_date = ? AND source = 'detected'
+	`, time.Now().UTC().Format(time.RFC3339Nano), day.Format("2006-01-02")); err != nil {
+		t.Fatalf("ignore block: %v", err)
+	}
+
+	// Reconcile again: the ignored block must not come back as active.
+	if err := rec.RebuildDay(context.Background(), loc, day); err != nil {
+		t.Fatalf("rebuild after ignore: %v", err)
+	}
+
+	var activeCount int
+	if err := db.QueryRowContext(context.Background(), `
+		SELECT COUNT(*) FROM work_blocks WHERE work_date = ? AND source = 'detected' AND status = 'active'
+	`, day.Format("2006-01-02")).Scan(&activeCount); err != nil {
+		t.Fatalf("count active blocks: %v", err)
+	}
+	if activeCount != 0 {
+		t.Fatalf("expected ignored block to stay ignored, got %d active detected blocks", activeCount)
+	}
+}
+
+func TestReconciler_IgnoredOpenBlockExtendsWithActiveTick(t *testing.T) {
+	db := newTestDB(t)
+	defer db.Close()
+
+	loc := time.UTC
+	day := time.Date(2026, 6, 13, 0, 0, 0, 0, loc)
+	start := day.Add(8 * time.Hour)
+	ignoredUntil := day.Add(10 * time.Hour)
+	nextTick := ignoredUntil.Add(15 * time.Minute)
+	insertEvent(t, db, start, EventActive)
+
+	rec := NewReconciler(db, clock.NewFixed(ignoredUntil))
+	if err := rec.RebuildDay(context.Background(), loc, day); err != nil {
+		t.Fatalf("rebuild: %v", err)
+	}
+
+	if _, err := db.ExecContext(context.Background(), `
+		UPDATE work_blocks SET status = 'ignored', updated_at = ?
+		WHERE work_date = ? AND source = 'detected'
+	`, ignoredUntil.Format(time.RFC3339Nano), day.Format("2006-01-02")); err != nil {
+		t.Fatalf("ignore open block: %v", err)
+	}
+
+	rec = NewReconciler(db, clock.NewFixed(nextTick))
+	if err := rec.RebuildDay(context.Background(), loc, day); err != nil {
+		t.Fatalf("rebuild after active tick: %v", err)
+	}
+
+	var activeCount int
+	if err := db.QueryRowContext(context.Background(), `
+		SELECT COUNT(*) FROM work_blocks WHERE work_date = ? AND source = 'detected' AND status = 'active'
+	`, day.Format("2006-01-02")).Scan(&activeCount); err != nil {
+		t.Fatalf("count active blocks: %v", err)
+	}
+	if activeCount != 0 {
+		t.Fatalf("expected ignored open block to stay ignored, got %d active detected blocks", activeCount)
+	}
+
+	var ignoredEndStr string
+	if err := db.QueryRowContext(context.Background(), `
+		SELECT ended_at FROM work_blocks WHERE work_date = ? AND source = 'detected' AND status = 'ignored'
+	`, day.Format("2006-01-02")).Scan(&ignoredEndStr); err != nil {
+		t.Fatalf("select ignored end: %v", err)
+	}
+	ignoredEnd, err := time.Parse(time.RFC3339Nano, ignoredEndStr)
+	if err != nil {
+		t.Fatalf("parse ignored end: %v", err)
+	}
+	if !ignoredEnd.Equal(nextTick) {
+		t.Fatalf("expected ignored block to extend to %v, got %v", nextTick, ignoredEnd)
 	}
 }

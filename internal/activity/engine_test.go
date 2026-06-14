@@ -48,7 +48,7 @@ func TestEngine_ActiveToIdleTransition(t *testing.T) {
 	mock := NewMockProvider(ActivityActive)
 	clk := clock.NewFixed(start)
 
-	eng := NewEngine(db, mock, clk, 3*time.Minute, 30*time.Second, 5*time.Second)
+	eng := NewEngine(db, mock, clk, 3*time.Minute, 5*time.Second)
 	ctx := context.Background()
 
 	eng.Process(ctx)
@@ -72,7 +72,7 @@ func TestEngine_ScreenLockEndsBlock(t *testing.T) {
 	mock := NewMockProvider(ActivityActive)
 	clk := clock.NewFixed(start)
 
-	eng := NewEngine(db, mock, clk, 3*time.Minute, 30*time.Second, 5*time.Second)
+	eng := NewEngine(db, mock, clk, 3*time.Minute, 5*time.Second)
 	ctx := context.Background()
 	eng.Process(ctx)
 
@@ -93,7 +93,7 @@ func TestEngine_ShortIdleGapKeepsBlock(t *testing.T) {
 	mock := NewMockProvider(ActivityActive)
 	clk := clock.NewFixed(start)
 
-	eng := NewEngine(db, mock, clk, 3*time.Minute, 30*time.Second, 5*time.Second)
+	eng := NewEngine(db, mock, clk, 3*time.Minute, 5*time.Second)
 	ctx := context.Background()
 	eng.Process(ctx)
 
@@ -116,7 +116,7 @@ func TestEngine_SuspendResume(t *testing.T) {
 	mock := NewMockProvider(ActivityActive)
 	clk := clock.NewFixed(start)
 
-	eng := NewEngine(db, mock, clk, 3*time.Minute, 30*time.Second, 5*time.Second)
+	eng := NewEngine(db, mock, clk, 3*time.Minute, 5*time.Second)
 	ctx := context.Background()
 	eng.Process(ctx)
 
@@ -129,5 +129,32 @@ func TestEngine_SuspendResume(t *testing.T) {
 	types := eventTypes(t, db)
 	if len(types) < 3 || types[1] != string(EventSuspend) || types[2] != string(EventResume) {
 		t.Fatalf("expected active, suspend, resume, got %v", types)
+	}
+}
+
+func TestEngine_RestoreStateAvoidsDuplicateActiveEvent(t *testing.T) {
+	db := newTestDB(t)
+	defer db.Close()
+
+	start := time.Date(2026, 6, 13, 8, 0, 0, 0, time.UTC)
+	// Pre-seed an active event as if the service was restarted while active.
+	_, err := db.ExecContext(context.Background(), `
+		INSERT INTO activity_events (occurred_at, event_type, provider, created_at)
+		VALUES (?, ?, 'mock', ?)
+	`, start.Format(time.RFC3339Nano), string(EventActive), start.Format(time.RFC3339Nano))
+	if err != nil {
+		t.Fatalf("insert event: %v", err)
+	}
+
+	mock := NewMockProvider(ActivityActive)
+	clk := clock.NewFixed(start.Add(2 * time.Minute))
+	eng := NewEngine(db, mock, clk, 3*time.Minute, 5*time.Second)
+
+	ctx := context.Background()
+	eng.Process(ctx)
+
+	types := eventTypes(t, db)
+	if len(types) != 1 || types[0] != string(EventActive) {
+		t.Fatalf("expected no duplicate active event, got %v", types)
 	}
 }

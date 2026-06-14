@@ -13,18 +13,18 @@ import (
 type Block struct {
 	Start time.Time
 	End   time.Time
+	Open  bool
 }
 
 // Reconciler computes work blocks from activity events.
 type Reconciler struct {
-	db         *sql.DB
-	clock      clock.Clock
-	tailCredit time.Duration
+	db    *sql.DB
+	clock clock.Clock
 }
 
 // NewReconciler creates a reconciler.
-func NewReconciler(db *sql.DB, clk clock.Clock, tailCredit time.Duration) *Reconciler {
-	return &Reconciler{db: db, clock: clk, tailCredit: tailCredit}
+func NewReconciler(db *sql.DB, clk clock.Clock) *Reconciler {
+	return &Reconciler{db: db, clock: clk}
 }
 
 // RebuildDay recalculates detected work blocks for a single calendar day.
@@ -35,7 +35,7 @@ func (r *Reconciler) RebuildDay(ctx context.Context, loc *time.Location, day tim
 	windowStart := start.AddDate(0, 0, -1)
 	windowEnd := start.AddDate(0, 0, 2)
 
-	blocks, err := r.computeBlocks(ctx, windowStart, windowEnd)
+	blocks, err := r.computeBlocks(ctx, windowStart, windowEnd, r.clock.Now())
 	if err != nil {
 		return err
 	}
@@ -52,7 +52,7 @@ func (r *Reconciler) RebuildDay(ctx context.Context, loc *time.Location, day tim
 	return r.persistDetectedBlocks(ctx, start, dayBlocks)
 }
 
-func (r *Reconciler) computeBlocks(ctx context.Context, start, end time.Time) ([]Block, error) {
+func (r *Reconciler) computeBlocks(ctx context.Context, start, end, now time.Time) ([]Block, error) {
 	rows, err := r.db.QueryContext(ctx, `
 		SELECT occurred_at, event_type FROM activity_events
 		WHERE occurred_at >= ? AND occurred_at < ?
@@ -63,7 +63,7 @@ func (r *Reconciler) computeBlocks(ctx context.Context, start, end time.Time) ([
 	}
 	defer rows.Close()
 
-	return r.buildBlocks(rows)
+	return r.buildBlocks(rows, now)
 }
 
 type eventRow struct {
@@ -71,7 +71,7 @@ type eventRow struct {
 	typ        string
 }
 
-func (r *Reconciler) buildBlocks(rows *sql.Rows) ([]Block, error) {
+func (r *Reconciler) buildBlocks(rows *sql.Rows, now time.Time) ([]Block, error) {
 	var events []eventRow
 	for rows.Next() {
 		var e eventRow
@@ -113,15 +113,22 @@ func (r *Reconciler) buildBlocks(rows *sql.Rows) ([]Block, error) {
 		}
 		if endEvents[e.typ] && inBlock {
 			end := e.occurredAt
-			if e.typ == string(EventIdle) {
-				end = end.Add(r.tailCredit)
-			}
 			if end.Before(blockStart) {
 				end = blockStart
 			}
 			blocks = append(blocks, Block{Start: blockStart, End: end})
 			inBlock = false
 		}
+	}
+
+	// Persist an open block so the current active period is visible even before
+	// an idle/locked/suspend event ends it.
+	if inBlock {
+		end := now
+		if end.Before(blockStart) {
+			end = blockStart
+		}
+		blocks = append(blocks, Block{Start: blockStart, End: end, Open: true})
 	}
 
 	return blocks, nil
@@ -141,6 +148,11 @@ func (r *Reconciler) persistDetectedBlocks(ctx context.Context, day time.Time, b
 		return fmt.Errorf("delete old detected blocks: %w", err)
 	}
 
+	ignored, err := r.loadIgnoredBlocks(ctx, tx, dateStr)
+	if err != nil {
+		return err
+	}
+
 	for _, b := range blocks {
 		// Split blocks crossing local midnight, but only store segments for the requested day.
 		dayStart := time.Date(day.Year(), day.Month(), day.Day(), 0, 0, 0, 0, day.Location())
@@ -156,14 +168,98 @@ func (r *Reconciler) persistDetectedBlocks(ctx context.Context, day time.Time, b
 		if !segStart.Before(segEnd) {
 			continue
 		}
-		segDate := segStart.Format("2006-01-02")
-		if _, err := tx.ExecContext(ctx, `
-			INSERT INTO work_blocks (work_date, started_at, ended_at, source, status, created_at, updated_at)
-			VALUES (?, ?, ?, 'detected', 'active', ?, ?)
-		`, segDate, segStart.Format(time.RFC3339Nano), segEnd.Format(time.RFC3339Nano), now, now); err != nil {
-			return fmt.Errorf("insert detected block: %w", err)
+		if b.Open {
+			var err error
+			segEnd, ignored, err = r.extendOverlappingIgnoredBlocks(ctx, tx, segStart, segEnd, ignored, now)
+			if err != nil {
+				return err
+			}
+		}
+		for _, segment := range r.subtractIgnoredBlocks(segStart, segEnd, ignored) {
+			segDate := segment.Start.Format("2006-01-02")
+			if _, err := tx.ExecContext(ctx, `
+				INSERT INTO work_blocks (work_date, started_at, ended_at, source, status, created_at, updated_at)
+				VALUES (?, ?, ?, 'detected', 'active', ?, ?)
+			`, segDate, segment.Start.Format(time.RFC3339Nano), segment.End.Format(time.RFC3339Nano), now, now); err != nil {
+				return fmt.Errorf("insert detected block: %w", err)
+			}
 		}
 	}
 
 	return tx.Commit()
+}
+
+type ignoredBlock struct {
+	ID int64
+	Block
+}
+
+func (r *Reconciler) loadIgnoredBlocks(ctx context.Context, tx *sql.Tx, dateStr string) ([]ignoredBlock, error) {
+	rows, err := tx.QueryContext(ctx, `
+		SELECT id, started_at, ended_at FROM work_blocks
+		WHERE work_date = ? AND source = 'detected' AND status = 'ignored'
+	`, dateStr)
+	if err != nil {
+		return nil, fmt.Errorf("query ignored blocks: %w", err)
+	}
+	defer rows.Close()
+
+	var ignored []ignoredBlock
+	for rows.Next() {
+		var id int64
+		var startStr, endStr string
+		if err := rows.Scan(&id, &startStr, &endStr); err != nil {
+			return nil, err
+		}
+		start, _ := time.Parse(time.RFC3339Nano, startStr)
+		end, _ := time.Parse(time.RFC3339Nano, endStr)
+		ignored = append(ignored, ignoredBlock{
+			ID:    id,
+			Block: Block{Start: start, End: end},
+		})
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return ignored, nil
+}
+
+func (r *Reconciler) extendOverlappingIgnoredBlocks(ctx context.Context, tx *sql.Tx, start, end time.Time, ignored []ignoredBlock, now string) (time.Time, []ignoredBlock, error) {
+	for i, ig := range ignored {
+		if ig.Start.After(start) || !blocksOverlap(start, end, ig.Start, ig.End) || !ig.End.Before(end) {
+			continue
+		}
+		if _, err := tx.ExecContext(ctx, `
+			UPDATE work_blocks SET ended_at = ?, updated_at = ? WHERE id = ?
+		`, end.Format(time.RFC3339Nano), now, ig.ID); err != nil {
+			return end, ignored, fmt.Errorf("extend ignored block: %w", err)
+		}
+		ignored[i].End = end
+	}
+	return end, ignored, nil
+}
+
+func (r *Reconciler) subtractIgnoredBlocks(start, end time.Time, ignored []ignoredBlock) []Block {
+	segments := []Block{{Start: start, End: end}}
+	for _, ig := range ignored {
+		var next []Block
+		for _, segment := range segments {
+			if !blocksOverlap(segment.Start, segment.End, ig.Start, ig.End) {
+				next = append(next, segment)
+				continue
+			}
+			if segment.Start.Before(ig.Start) {
+				next = append(next, Block{Start: segment.Start, End: ig.Start})
+			}
+			if ig.End.Before(segment.End) {
+				next = append(next, Block{Start: ig.End, End: segment.End})
+			}
+		}
+		segments = next
+	}
+	return segments
+}
+
+func blocksOverlap(aStart, aEnd, bStart, bEnd time.Time) bool {
+	return aStart.Before(bEnd) && bStart.Before(aEnd)
 }
