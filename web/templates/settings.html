@@ -5,7 +5,6 @@
     <input type="hidden" name="csrf_token" value="{{ .CSRFToken }}">
     <label>{{ T "PollInterval" }} <input type="text" name="poll_interval" value="{{ .Config.Activity.PollInterval }}"></label>
     <label>{{ T "IdleThreshold" }} <input type="text" name="idle_threshold" value="{{ .Config.Activity.IdleThreshold }}"></label>
-    <label>{{ T "TailCredit" }} <input type="text" name="tail_credit" value="{{ .Config.Activity.TailCredit }}"></label>
     <label>{{ T "ListenAddress" }} <input type="text" name="listen_address" value="{{ .Config.Server.ListenAddress }}"></label>
     <label>{{ T "Timezone" }}
       <select name="timezone">

@@ -29,9 +29,9 @@ func TestCatalog_TFallback(t *testing.T) {
 
 func TestCatalog_Tf(t *testing.T) {
 	cat := NewCatalog()
-	got := cat.Tf(German, "WorkedMinutes", map[string]any{"Minutes": 42})
-	if got != "42 Min." {
-		t.Errorf("Tf = %q, want 42 Min.", got)
+	got := cat.Tf(German, "WeekRange", map[string]any{"Start": "01.06.", "End": "07.06."})
+	if got != "Woche 01.06. - 07.06." {
+		t.Errorf("Tf = %q, want Woche 01.06. - 07.06.", got)
 	}
 }
 

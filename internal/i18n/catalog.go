@@ -80,17 +80,15 @@ func NewCatalog() Catalog {
 			"StatusUnknown":   "Unbekannt",
 
 			// Week view
-			"WeekRange":     "Woche {{.Start}} - {{.End}}",
-			"TotalTracked":  "Gesamt",
-			"BookedDays":    "Gebuchte Tage",
-			"UnbookedDays":  "Ungebuchte Tage",
-			"Day":           "Tag",
-			"WorkedMinutes": "{{.Minutes}} Min.",
-			"PauseMinutes":  "{{.Minutes}} Min.",
-			"Blocks":        "Blöcke",
-			"Changed":       "Geändert",
-			"Yes":           "ja",
-			"No":            "nein",
+			"WeekRange":    "Woche {{.Start}} - {{.End}}",
+			"TotalTracked": "Gesamt",
+			"BookedDays":   "Gebuchte Tage",
+			"UnbookedDays": "Ungebuchte Tage",
+			"Day":          "Tag",
+			"Blocks":       "Blöcke",
+			"Changed":      "Geändert",
+			"Yes":          "ja",
+			"No":           "nein",
 
 			// Month view
 			"Previous": "Zurück",
@@ -141,7 +139,6 @@ func NewCatalog() Catalog {
 			// Settings
 			"PollInterval":      "Abfrageintervall",
 			"IdleThreshold":     "Inaktivitätsschwelle",
-			"TailCredit":        "Nachlaufgutschrift",
 			"ListenAddress":     "Listen-Adresse",
 			"Timezone":          "Zeitzone",
 			"UseSystemTimezone": "Systemzeitzone verwenden",
@@ -203,17 +200,15 @@ func NewCatalog() Catalog {
 			"StatusUnknown":   "Unknown",
 
 			// Week view
-			"WeekRange":     "Week {{.Start}} - {{.End}}",
-			"TotalTracked":  "Total tracked",
-			"BookedDays":    "Booked days",
-			"UnbookedDays":  "Unbooked days",
-			"Day":           "Day",
-			"WorkedMinutes": "{{.Minutes}} min",
-			"PauseMinutes":  "{{.Minutes}} min",
-			"Blocks":        "Blocks",
-			"Changed":       "Changed",
-			"Yes":           "yes",
-			"No":            "no",
+			"WeekRange":    "Week {{.Start}} - {{.End}}",
+			"TotalTracked": "Total tracked",
+			"BookedDays":   "Booked days",
+			"UnbookedDays": "Unbooked days",
+			"Day":          "Day",
+			"Blocks":       "Blocks",
+			"Changed":      "Changed",
+			"Yes":          "yes",
+			"No":           "no",
 
 			// Month view
 			"Previous": "Previous",
@@ -264,7 +259,6 @@ func NewCatalog() Catalog {
 			// Settings
 			"PollInterval":      "Poll interval",
 			"IdleThreshold":     "Idle threshold",
-			"TailCredit":        "Tail credit",
 			"ListenAddress":     "Listen address",
 			"Timezone":          "Timezone",
 			"UseSystemTimezone": "Use system timezone",

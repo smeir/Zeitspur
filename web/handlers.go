@@ -61,7 +61,12 @@ func (s *Server) dayData(r *http.Request, date string) map[string]any {
 	}
 
 	blocks, _ := s.blocksForDay(ctx, date)
-	running, runningMinutes := s.currentBlock(ctx, date)
+
+	var running *time.Time
+	var runningMinutes int
+	if state == activity.ActivityActive {
+		running, runningMinutes = s.currentBlock(ctx, date)
+	}
 
 	dateObj, _ := time.Parse("2006-01-02", date)
 
@@ -71,7 +76,7 @@ func (s *Server) dayData(r *http.Request, date string) map[string]any {
 		"Status":              string(state),
 		"CurrentBlockStart":   running,
 		"RunningMinutes":      runningMinutes,
-		"WorkedMinutes":       sum.WorkedMinutes + runningMinutes,
+		"WorkedMinutes":       sum.WorkedMinutes,
 		"PauseMinutes":        sum.PauseMinutes,
 		"Booked":              status.Booked,
 		"ChangedAfterBooking": status.Booked && status.BookingRevision < status.CurrentRevision,
@@ -106,7 +111,7 @@ func (s *Server) currentBlock(ctx context.Context, date string) (*time.Time, int
 		string(activity.EventLocked):  true,
 		string(activity.EventSuspend): true,
 	}
-	var lastStart *time.Time
+	var blockStart *time.Time
 	for rows.Next() {
 		var ts, typ string
 		if err := rows.Scan(&ts, &typ); err != nil {
@@ -117,22 +122,24 @@ func (s *Server) currentBlock(ctx context.Context, date string) (*time.Time, int
 			continue
 		}
 		if startEvents[typ] {
-			lastStart = &t
+			if blockStart == nil {
+				blockStart = &t
+			}
 		}
-		if endEvents[typ] && lastStart != nil {
-			lastStart = nil
+		if endEvents[typ] {
+			blockStart = nil
 		}
 	}
-	if err := rows.Err(); err != nil || lastStart == nil {
+	if err := rows.Err(); err != nil || blockStart == nil {
 		return nil, 0
 	}
 
 	now := s.clk.Now().In(loc)
-	if now.Before(*lastStart) {
-		return lastStart, 0
+	if now.Before(*blockStart) {
+		return blockStart, 0
 	}
-	minutes := int(now.Sub(*lastStart).Minutes())
-	return lastStart, minutes
+	minutes := int(now.Sub(*blockStart).Minutes())
+	return blockStart, minutes
 }
 
 type blockView struct {
@@ -148,7 +155,7 @@ func (s *Server) blocksForDay(ctx context.Context, date string) ([]blockView, er
 	rows, err := s.db.QueryContext(ctx, `
 		SELECT id, work_date, started_at, ended_at, source, status, note
 		FROM work_blocks
-		WHERE work_date = ? AND status != 'deleted'
+		WHERE work_date = ? AND status NOT IN ('deleted', 'ignored')
 		ORDER BY started_at ASC
 	`, date)
 	if err != nil {
@@ -583,7 +590,6 @@ func (s *Server) handleSettingsSave(w http.ResponseWriter, r *http.Request) {
 	cfg := s.config()
 	cfg.Activity.PollInterval = r.FormValue("poll_interval")
 	cfg.Activity.IdleThreshold = r.FormValue("idle_threshold")
-	cfg.Activity.TailCredit = r.FormValue("tail_credit")
 	cfg.Server.ListenAddress = r.FormValue("listen_address")
 	cfg.App.Timezone = r.FormValue("timezone")
 	cfg.App.Language = r.FormValue("language")

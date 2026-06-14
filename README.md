@@ -149,8 +149,7 @@ Available settings:
 ```toml
 [activity]
 poll_interval = "5s"
-idle_threshold = "3m"
-tail_credit = "30s"
+idle_threshold = "5m"
 
 [server]
 listen_address = "127.0.0.1:8787"
@@ -212,9 +211,9 @@ make run     # build and run serve
 
 ## Attribution
 
-- **Architecture:** designed with GPT 5.5
+- **Init Prompt:** designed with GPT 5.5
 - **Implementation:** Kimi 2.7 Code
-- **Code review:** Opus 4.8
+- **Code review:** Opus 4.8 + GPT 5.5
 
 ## License
 

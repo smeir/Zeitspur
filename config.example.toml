@@ -3,8 +3,7 @@
 
 [activity]
 poll_interval = "5s"
-idle_threshold = "3m"
-tail_credit = "30s"
+idle_threshold = "5m"
 
 [server]
 listen_address = "127.0.0.1:8787"

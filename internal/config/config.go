@@ -14,8 +14,7 @@ const (
 	AppName = "zeitspur"
 
 	DefaultPollInterval  = 5 * time.Second
-	DefaultIdleThreshold = 3 * time.Minute
-	DefaultTailCredit    = 30 * time.Second
+	DefaultIdleThreshold = 5 * time.Minute
 	DefaultListenAddress = "127.0.0.1:8787"
 	DefaultTimezone      = "local"
 	DefaultLanguage      = "de"
@@ -32,7 +31,6 @@ type Config struct {
 type ActivityConfig struct {
 	PollInterval  string `toml:"poll_interval"`
 	IdleThreshold string `toml:"idle_threshold"`
-	TailCredit    string `toml:"tail_credit"`
 }
 
 // ServerConfig holds HTTP server settings.
@@ -52,9 +50,6 @@ func (c Config) PollInterval() time.Duration {
 }
 func (c Config) IdleThreshold() time.Duration {
 	return parseDuration(c.Activity.IdleThreshold, DefaultIdleThreshold)
-}
-func (c Config) TailCredit() time.Duration {
-	return parseDuration(c.Activity.TailCredit, DefaultTailCredit)
 }
 
 func parseDuration(s string, def time.Duration) time.Duration {
@@ -98,7 +93,6 @@ func Load(path string) (Config, error) {
 		Activity: ActivityConfig{
 			PollInterval:  DefaultPollInterval.String(),
 			IdleThreshold: DefaultIdleThreshold.String(),
-			TailCredit:    DefaultTailCredit.String(),
 		},
 		Server: ServerConfig{
 			ListenAddress: DefaultListenAddress,
@@ -161,9 +155,6 @@ func (c Config) Validate() error {
 	}
 	if c.IdleThreshold() <= 0 {
 		return fmt.Errorf("idle_threshold must be positive")
-	}
-	if c.TailCredit() < 0 {
-		return fmt.Errorf("tail_credit must be non-negative")
 	}
 	if c.Server.ListenAddress == "" {
 		return fmt.Errorf("listen_address must not be empty")

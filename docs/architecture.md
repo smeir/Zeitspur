@@ -69,6 +69,7 @@ flowchart TB
     clock[clock.Clock]
     systemd[systemd]
     i18n[i18n]
+    timeutil[timeutil]
   end
 
   subgraph web[web]
@@ -155,9 +156,9 @@ The reconciler (`internal/activity/reconcile.go`) computes `work_blocks` from th
 
 - A block starts on `active`, `unlocked`, or `resume`.
 - A block ends on `idle`, `locked`, or `suspend`.
-- Idle events add `tail_credit` to the end of the block so small pauses do not split work time.
 - Blocks that cross midnight are split per calendar day.
 - Only `detected`/`active` blocks are replaced on each rebuild; manual blocks and ignored/deleted blocks are preserved.
+- Ignored detected blocks are subtracted from newly computed detected blocks; if the user ignores the currently open block, later active ticks extend that ignored block instead of recreating it as active.
 
 All state names are defined in `internal/activity/types.go`.
 
@@ -354,8 +355,7 @@ Configuration is loaded from `~/.config/zeitspur/config.toml`:
 | Section | Key | Default | Purpose |
 | --- | --- | --- | --- |
 | `activity` | `poll_interval` | `5s` | How often the engine polls the provider. |
-| `activity` | `idle_threshold` | `3m` | Time before the user is considered idle. |
-| `activity` | `tail_credit` | `30s` | Grace period added after idle to keep short pauses inside a block. |
+| `activity` | `idle_threshold` | `5m` | Time before the user is considered idle. |
 | `server` | `listen_address` | `127.0.0.1:8787` | Web UI bind address. |
 | `app` | `timezone` | `local` | `local` or an IANA timezone. |
 | `app` | `language` | `de` | UI language: `de` or `en`. |
