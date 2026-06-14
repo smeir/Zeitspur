@@ -211,6 +211,12 @@ make lint    # run go vet and go fmt
 make run     # build and run serve
 ```
 
+## Attribution
+
+- **Architecture:** designed with GPT 5.5
+- **Implementation:** Kimi 2.7 Code
+- **Code review:** Opus 4.8
+
 ## License
 
 MIT License. See [LICENSE](LICENSE).
