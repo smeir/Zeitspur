@@ -178,8 +178,6 @@ unlocked
 suspend
 resume
 provider_error
-service_started
-service_stopped
 ```
 
 Calculated working blocks should be stored or reproducibly derived from activity events.

@@ -4,7 +4,6 @@ import (
 	"context"
 	"database/sql"
 	"encoding/json"
-	"fmt"
 	"log/slog"
 	"time"
 
@@ -39,25 +38,8 @@ func NewEngine(db *sql.DB, provider ActivityProvider, clk clock.Clock, idleThres
 	}
 }
 
-// RecordServiceStarted writes the service_started event.
-func (e *Engine) RecordServiceStarted(ctx context.Context) error {
-	return e.insertEvent(ctx, EventServiceStarted, nil)
-}
-
-// RecordServiceStopped writes the service_stopped event.
-func (e *Engine) RecordServiceStopped(ctx context.Context) error {
-	return e.insertEvent(ctx, EventServiceStopped, nil)
-}
-
 // Run polls the provider until the context is cancelled.
 func (e *Engine) Run(ctx context.Context) error {
-	if err := e.RecordServiceStarted(ctx); err != nil {
-		return fmt.Errorf("record service started: %w", err)
-	}
-	defer func() {
-		_ = e.RecordServiceStopped(context.Background())
-	}()
-
 	ticker := time.NewTicker(e.pollInterval)
 	defer ticker.Stop()
 

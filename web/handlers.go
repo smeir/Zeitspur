@@ -106,11 +106,6 @@ func (s *Server) currentBlock(ctx context.Context, date string) (*time.Time, int
 		string(activity.EventLocked):  true,
 		string(activity.EventSuspend): true,
 	}
-	terminators := map[string]bool{
-		string(activity.EventServiceStarted): true,
-		string(activity.EventServiceStopped): true,
-	}
-
 	var lastStart *time.Time
 	for rows.Next() {
 		var ts, typ string
@@ -124,7 +119,7 @@ func (s *Server) currentBlock(ctx context.Context, date string) (*time.Time, int
 		if startEvents[typ] {
 			lastStart = &t
 		}
-		if (endEvents[typ] || terminators[typ]) && lastStart != nil {
+		if endEvents[typ] && lastStart != nil {
 			lastStart = nil
 		}
 	}

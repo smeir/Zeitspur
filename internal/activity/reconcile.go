@@ -104,11 +104,6 @@ func (r *Reconciler) buildBlocks(rows *sql.Rows) ([]Block, error) {
 		string(EventLocked):  true,
 		string(EventSuspend): true,
 	}
-	terminators := map[string]bool{
-		string(EventServiceStarted): true,
-		string(EventServiceStopped): true,
-	}
-
 	for _, e := range events {
 		if startEvents[e.typ] {
 			if !inBlock {
@@ -125,10 +120,6 @@ func (r *Reconciler) buildBlocks(rows *sql.Rows) ([]Block, error) {
 				end = blockStart
 			}
 			blocks = append(blocks, Block{Start: blockStart, End: end})
-			inBlock = false
-		}
-		if terminators[e.typ] && inBlock {
-			blocks = append(blocks, Block{Start: blockStart, End: e.occurredAt})
 			inBlock = false
 		}
 	}

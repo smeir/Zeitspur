@@ -17,7 +17,7 @@ This is the project's most important principle. Zeitspur is **not** a keylogger 
 It **never** stores: keystrokes, key codes, typed text, clipboard content, window titles, application names, document names, browser URLs, or screenshots.
 
 Only high-level state transitions with timestamps are stored:
-`active`, `idle`, `locked`, `unlocked`, `suspend`, `resume`, `service_started`, `service_stopped`, `provider_error`.
+`active`, `idle`, `locked`, `unlocked`, `suspend`, `resume`, `provider_error`.
 
 > **Rule for agents:** Any change that would capture or store finer-grained data must be rejected or explicitly confirmed with the user. The privacy model takes precedence over features.
 

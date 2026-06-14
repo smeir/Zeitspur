@@ -3,6 +3,7 @@ package systemd
 
 import (
 	"fmt"
+	"io"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -47,8 +48,9 @@ func DefaultPaths() (Paths, error) {
 }
 
 // Install copies the binary and enables the user service.
-// If a service is already running, it is stopped first so the binary can be
-// overwritten (fresh installs tolerate the failed stop command).
+// If a service is already running, it is stopped first. The binary is written
+// to a temporary file and renamed atomically so a still-running old process
+// keeps its inode and systemd never sees a partially-written executable.
 func Install(currentBinary string) error {
 	paths, err := DefaultPaths()
 	if err != nil {
@@ -62,7 +64,7 @@ func Install(currentBinary string) error {
 		return fmt.Errorf("mkdir unit dir: %w", err)
 	}
 
-	// Stop any running instance before overwriting the binary.
+	// Stop any running instance before replacing the binary.
 	_ = run("systemctl", "--user", "stop", "zeitspur.service")
 
 	src, err := os.Open(currentBinary)
@@ -71,23 +73,24 @@ func Install(currentBinary string) error {
 	}
 	defer src.Close()
 
-	dst, err := os.OpenFile(paths.BinaryPath, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, 0o755)
+	tmpPath := paths.BinaryPath + ".tmp"
+	_ = os.Remove(tmpPath)
+	dst, err := os.OpenFile(tmpPath, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, 0o755)
 	if err != nil {
-		return fmt.Errorf("open destination binary: %w", err)
+		return fmt.Errorf("open temporary binary: %w", err)
 	}
-	defer dst.Close()
-
-	buf := make([]byte, 4096)
-	for {
-		n, err := src.Read(buf)
-		if n > 0 {
-			if _, werr := dst.Write(buf[:n]); werr != nil {
-				return fmt.Errorf("write binary: %w", werr)
-			}
-		}
-		if err != nil {
-			break
-		}
+	if _, err := io.Copy(dst, src); err != nil {
+		_ = dst.Close()
+		_ = os.Remove(tmpPath)
+		return fmt.Errorf("copy binary: %w", err)
+	}
+	if err := dst.Close(); err != nil {
+		_ = os.Remove(tmpPath)
+		return fmt.Errorf("close temporary binary: %w", err)
+	}
+	if err := os.Rename(tmpPath, paths.BinaryPath); err != nil {
+		_ = os.Remove(tmpPath)
+		return fmt.Errorf("rename binary: %w", err)
 	}
 
 	if err := os.WriteFile(paths.UnitPath, []byte(unitTemplate), 0o644); err != nil {

@@ -27,13 +27,11 @@ type ActivityProvider interface {
 type EventType string
 
 const (
-	EventActive         EventType = "active"
-	EventIdle           EventType = "idle"
-	EventLocked         EventType = "locked"
-	EventUnlocked       EventType = "unlocked"
-	EventSuspend        EventType = "suspend"
-	EventResume         EventType = "resume"
-	EventProviderError  EventType = "provider_error"
-	EventServiceStarted EventType = "service_started"
-	EventServiceStopped EventType = "service_stopped"
+	EventActive        EventType = "active"
+	EventIdle          EventType = "idle"
+	EventLocked        EventType = "locked"
+	EventUnlocked      EventType = "unlocked"
+	EventSuspend       EventType = "suspend"
+	EventResume        EventType = "resume"
+	EventProviderError EventType = "provider_error"
 )

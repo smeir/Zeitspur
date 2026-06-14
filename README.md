@@ -31,7 +31,7 @@ It **never** stores:
 - screenshots
 
 Only high-level state transitions and timestamps are stored:
-`active`, `idle`, `locked`, `unlocked`, `suspend`, `resume`, `service_started`, `service_stopped`, and `provider_error`.
+`active`, `idle`, `locked`, `unlocked`, `suspend`, `resume`, and `provider_error`.
 
 The activity collector only knows whether the user is active, idle, locked, suspended, or unavailable.
 

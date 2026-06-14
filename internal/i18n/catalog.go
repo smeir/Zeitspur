@@ -323,7 +323,7 @@ func (c Catalog) SourceLabel(locale Locale, source string) string {
 }
 
 // pascalCase converts a snake_case, kebab-case or space-separated identifier to
-// PascalCase, e.g. "service_started" becomes "ServiceStarted".
+// PascalCase, e.g. "provider_error" becomes "ProviderError".
 func pascalCase(s string) string {
 	parts := strings.FieldsFunc(s, func(r rune) bool {
 		return r == '_' || r == '-' || r == ' '

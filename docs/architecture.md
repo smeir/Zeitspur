@@ -149,13 +149,12 @@ The engine (`internal/activity/engine.go`) runs a ticker at `poll_interval`. On 
 - `active` is emitted whenever the user becomes active after `idle`, `locked`, or `suspended`.
 - `idle` is emitted once `idle_threshold` has passed since the last activity; the timestamp is back-dated to the real idle start.
 - `locked` / `unlocked` and `suspend` / `resume` map directly to lock and power events.
-- `service_started` and `service_stopped` bracket the engine lifecycle.
 - `provider_error` is recorded once per consecutive failure with error metadata.
 
 The reconciler (`internal/activity/reconcile.go`) computes `work_blocks` from the event stream:
 
 - A block starts on `active`, `unlocked`, or `resume`.
-- A block ends on `idle`, `locked`, `suspend`, `service_started`, or `service_stopped`.
+- A block ends on `idle`, `locked`, or `suspend`.
 - Idle events add `tail_credit` to the end of the block so small pauses do not split work time.
 - Blocks that cross midnight are split per calendar day.
 - Only `detected`/`active` blocks are replaced on each rebuild; manual blocks and ignored/deleted blocks are preserved.
@@ -376,8 +375,7 @@ Zeitspur is intentionally **not** a keylogger or activity monitor. The following
 Only these high-level state transitions with timestamps are persisted:
 
 ```text
-active, idle, locked, unlocked, suspend, resume,
-service_started, service_stopped, provider_error
+active, idle, locked, unlocked, suspend, resume, provider_error
 ```
 
 Any change that would capture finer-grained data must be rejected or explicitly confirmed with the user. The privacy model takes precedence over features.
