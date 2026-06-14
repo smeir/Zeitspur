@@ -2,8 +2,7 @@
 
 Zeitspur is a privacy-friendly local Linux application for automatically tracking working activity and managing whether individual workdays have already been booked in a company time-tracking system.
 
-It is distributed as a single Go binary containing the complete web UI. No Node.js, npm, or frontend build step is required.
-
+It is distributed as a single Go binary containing the complete web UI.
 ## Features
 
 - Runs automatically in the background as a systemd user service.
