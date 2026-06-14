@@ -27,7 +27,7 @@ func (s *Server) handleToday(w http.ResponseWriter, r *http.Request) {
 func (s *Server) handleTodayStatus(w http.ResponseWriter, r *http.Request) {
 	date := s.clk.Now().In(s.location()).Format("2006-01-02")
 	d := s.dayData(r, date)
-	s.render(w, r, "today", d, http.StatusOK)
+	s.renderBlock(w, r, "today", "today_status", d, http.StatusOK)
 }
 
 func (s *Server) handleDay(w http.ResponseWriter, r *http.Request) {
@@ -143,19 +143,22 @@ func (s *Server) currentBlock(ctx context.Context, date string) (*time.Time, int
 }
 
 type blockView struct {
-	ID     int
-	Date   string
-	Start  time.Time
-	End    time.Time
-	Source string
-	Note   string
+	ID       int
+	Date     string
+	Start    time.Time
+	End      time.Time
+	StartStr string
+	EndStr   string
+	Source   string
+	Status   string
+	Note     string
 }
 
 func (s *Server) blocksForDay(ctx context.Context, date string) ([]blockView, error) {
 	rows, err := s.db.QueryContext(ctx, `
 		SELECT id, work_date, started_at, ended_at, source, status, note
 		FROM work_blocks
-		WHERE work_date = ? AND status NOT IN ('deleted', 'ignored')
+		WHERE work_date = ? AND status != 'deleted'
 		ORDER BY started_at ASC
 	`, date)
 	if err != nil {
@@ -166,13 +169,15 @@ func (s *Server) blocksForDay(ctx context.Context, date string) ([]blockView, er
 	var blocks []blockView
 	for rows.Next() {
 		var b blockView
-		var status, note sql.NullString
+		var note sql.NullString
 		var startStr, endStr string
-		if err := rows.Scan(&b.ID, &b.Date, &startStr, &endStr, &b.Source, &status, &note); err != nil {
+		if err := rows.Scan(&b.ID, &b.Date, &startStr, &endStr, &b.Source, &b.Status, &note); err != nil {
 			return nil, err
 		}
 		b.Start, _ = time.Parse(time.RFC3339Nano, startStr)
 		b.End, _ = time.Parse(time.RFC3339Nano, endStr)
+		b.StartStr = startStr
+		b.EndStr = endStr
 		if note.Valid {
 			b.Note = note.String
 		}
@@ -181,20 +186,10 @@ func (s *Server) blocksForDay(ctx context.Context, date string) ([]blockView, er
 	return blocks, rows.Err()
 }
 
-func (s *Server) handleDayBook(w http.ResponseWriter, r *http.Request) {
-	date := chi.URLParam(r, "date")
-	booked := r.FormValue("booked") == "true"
-	br := booking.NewRepository(s.db)
-	if err := br.SetBooked(r.Context(), date, booked); err != nil {
-		slog.Error("set booked failed", "error", err)
-	}
-	http.Redirect(w, r, "/day/"+date, http.StatusFound)
-}
-
 func (s *Server) handleDayBlock(w http.ResponseWriter, r *http.Request) {
 	date := chi.URLParam(r, "date")
-	start := r.FormValue("start")
-	end := r.FormValue("end")
+	start := r.FormValue("start_hour") + ":" + r.FormValue("start_minute")
+	end := r.FormValue("end_hour") + ":" + r.FormValue("end_minute")
 	note := r.FormValue("note")
 
 	s0, e0, err := s.parseDayTimes(date, start, end)
@@ -220,13 +215,63 @@ func (s *Server) handleDayBlock(w http.ResponseWriter, r *http.Request) {
 func (s *Server) handleBlockIgnore(w http.ResponseWriter, r *http.Request) {
 	date := chi.URLParam(r, "date")
 	idStr := chi.URLParam(r, "id")
-	_, err := s.db.ExecContext(r.Context(), `UPDATE work_blocks SET status = 'ignored', updated_at = ? WHERE id = ?`, time.Now().UTC().Format(time.RFC3339Nano), idStr)
+	started := r.FormValue("started_at")
+	ended := r.FormValue("ended_at")
+	s.updateBlockStatus(r.Context(), date, idStr, started, ended, "ignored", "active")
+	br := booking.NewRepository(s.db)
+	_ = br.BumpRevision(r.Context(), date)
+	http.Redirect(w, r, "/day/"+date, http.StatusFound)
+}
+
+func (s *Server) handleBlockUnignore(w http.ResponseWriter, r *http.Request) {
+	date := chi.URLParam(r, "date")
+	idStr := chi.URLParam(r, "id")
+	started := r.FormValue("started_at")
+	ended := r.FormValue("ended_at")
+	s.updateBlockStatus(r.Context(), date, idStr, started, ended, "active", "ignored")
+	br := booking.NewRepository(s.db)
+	_ = br.BumpRevision(r.Context(), date)
+	http.Redirect(w, r, "/day/"+date, http.StatusFound)
+}
+
+func (s *Server) handleBlockDelete(w http.ResponseWriter, r *http.Request) {
+	date := chi.URLParam(r, "date")
+	idStr := chi.URLParam(r, "id")
+	now := time.Now().UTC().Format(time.RFC3339Nano)
+	res, err := s.db.ExecContext(r.Context(), `UPDATE work_blocks SET status = 'deleted', updated_at = ? WHERE id = ? AND source = 'manual'`, now, idStr)
 	if err != nil {
-		slog.Error("ignore block failed", "error", err)
+		slog.Error("delete block failed", "error", err)
+		http.Error(w, "delete block failed", http.StatusInternalServerError)
+		return
+	}
+	if n, _ := res.RowsAffected(); n == 0 {
+		started := r.FormValue("started_at")
+		ended := r.FormValue("ended_at")
+		_, err = s.db.ExecContext(r.Context(), `UPDATE work_blocks SET status = 'deleted', updated_at = ? WHERE work_date = ? AND source = 'manual' AND status = 'active' AND started_at = ? AND ended_at = ?`, now, date, started, ended)
+		if err != nil {
+			slog.Error("delete block fallback failed", "error", err)
+			http.Error(w, "delete block failed", http.StatusInternalServerError)
+			return
+		}
 	}
 	br := booking.NewRepository(s.db)
 	_ = br.BumpRevision(r.Context(), date)
 	http.Redirect(w, r, "/day/"+date, http.StatusFound)
+}
+
+func (s *Server) updateBlockStatus(ctx context.Context, date, idStr, started, ended, newStatus, fallbackCurrentStatus string) {
+	now := time.Now().UTC().Format(time.RFC3339Nano)
+	res, err := s.db.ExecContext(ctx, `UPDATE work_blocks SET status = ?, updated_at = ? WHERE id = ?`, newStatus, now, idStr)
+	if err != nil {
+		slog.Error("update block status failed", "error", err, "id", idStr, "status", newStatus)
+		return
+	}
+	if n, _ := res.RowsAffected(); n == 0 {
+		_, err = s.db.ExecContext(ctx, `UPDATE work_blocks SET status = ?, updated_at = ? WHERE work_date = ? AND status = ? AND started_at = ? AND ended_at = ?`, newStatus, now, date, fallbackCurrentStatus, started, ended)
+		if err != nil {
+			slog.Error("fallback update block status failed", "error", err, "date", date, "status", newStatus)
+		}
+	}
 }
 
 func (s *Server) handleWeek(w http.ResponseWriter, r *http.Request) {

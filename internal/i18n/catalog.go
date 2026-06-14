@@ -67,10 +67,12 @@ func NewCatalog() Catalog {
 			"Note":                "Notiz",
 			"Actions":             "Aktionen",
 			"Ignore":              "Ignorieren",
+			"Unignore":            "Ignorieren zurücksetzen",
+			"Delete":              "Löschen",
+			"Ignored":             "Ignoriert",
 			"AddManualBlock":      "Manuellen Block hinzufügen",
 			"Add":                 "Hinzufügen",
-			"MarkDayBooked":       "Tag als gebucht markieren",
-			"MarkDayNotBooked":    "Tag als nicht gebucht markieren",
+			"Cancel":              "Abbrechen",
 
 			// Activity status labels (activity.ActivityState values)
 			"StatusActive":    "Aktiv",
@@ -187,10 +189,12 @@ func NewCatalog() Catalog {
 			"Note":                "Note",
 			"Actions":             "Actions",
 			"Ignore":              "Ignore",
+			"Unignore":            "Reset ignore",
+			"Delete":              "Delete",
+			"Ignored":             "Ignored",
 			"AddManualBlock":      "Add manual block",
 			"Add":                 "Add",
-			"MarkDayBooked":       "Mark day as booked",
-			"MarkDayNotBooked":    "Mark day as not booked",
+			"Cancel":              "Cancel",
 
 			// Activity status labels (activity.ActivityState values)
 			"StatusActive":    "Active",

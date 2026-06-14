@@ -1,19 +1,5 @@
 {{ define "content" }}
-<div class="card" hx-get="/today/status" hx-trigger="every 10s" hx-swap="outerHTML">
-  <h2>{{ Tf "TodayDate" (dict "Date" (dateShort .DateObj)) }}</h2>
-  <p>
-    {{ T "Status" }}:
-    <span class="status-badge status-{{ .Status }}">{{ statusLabel .Status }}</span>
-  </p>
-  {{ if .CurrentBlockStart }}
-    <p>{{ Tf "CurrentBlockStarted" (dict "Time" (.CurrentBlockStart.Format "15:04") "Minutes" .RunningMinutes) }}</p>
-  {{ end }}
-  <p>{{ T "Worked" }}: {{ formatMinutes .WorkedMinutes }} &middot; {{ T "Pause" }}: {{ formatMinutes .PauseMinutes }}</p>
-  <p>{{ T "Booking" }}: <span class="{{ if .Booked }}booked{{ else }}unbooked{{ end }}">{{ bookedLabel .Booked }}</span></p>
-  {{ if .ChangedAfterBooking }}
-    <p class="changed">{{ T "ChangedAfterBooking" }}</p>
-  {{ end }}
-</div>
+{{ template "today_status" . }}
 
 <div class="card">
   <h3>{{ T "WorkBlocks" }}</h3>
@@ -24,16 +10,38 @@
     </thead>
     <tbody>
     {{ range .Blocks }}
-      <tr>
+      <tr class="{{ if eq .Status "ignored" }}ignored{{ end }}">
         <td>{{ .Start.Format "15:04" }}</td>
         <td>{{ .End.Format "15:04" }}</td>
-        <td>{{ sourceLabel .Source }}</td>
+        <td>
+          {{ sourceLabel .Source }}
+          {{ if eq .Status "ignored" }}<span class="ignored-badge">({{ T "Ignored" }})</span>{{ end }}
+        </td>
         <td>{{ .Note }}</td>
         <td>
-          <form class="inline" action="/day/{{ .Date }}/block/{{ .ID }}/ignore" method="post">
-            <input type="hidden" name="csrf_token" value="{{ $.CSRFToken }}">
-            <button type="submit" class="secondary">{{ T "Ignore" }}</button>
-          </form>
+          {{ if eq .Status "ignored" }}
+            <form class="inline" action="/day/{{ .Date }}/block/{{ .ID }}/unignore" method="post">
+              <input type="hidden" name="csrf_token" value="{{ $.CSRFToken }}">
+              <input type="hidden" name="started_at" value="{{ .StartStr }}">
+              <input type="hidden" name="ended_at" value="{{ .EndStr }}">
+              <button type="submit" class="secondary">{{ T "Unignore" }}</button>
+            </form>
+          {{ else }}
+            <form class="inline" action="/day/{{ .Date }}/block/{{ .ID }}/ignore" method="post">
+              <input type="hidden" name="csrf_token" value="{{ $.CSRFToken }}">
+              <input type="hidden" name="started_at" value="{{ .StartStr }}">
+              <input type="hidden" name="ended_at" value="{{ .EndStr }}">
+              <button type="submit" class="secondary">{{ T "Ignore" }}</button>
+            </form>
+          {{ end }}
+          {{ if eq .Source "manual" }}
+            <form class="inline" action="/day/{{ .Date }}/block/{{ .ID }}/delete" method="post">
+              <input type="hidden" name="csrf_token" value="{{ $.CSRFToken }}">
+              <input type="hidden" name="started_at" value="{{ .StartStr }}">
+              <input type="hidden" name="ended_at" value="{{ .EndStr }}">
+              <button type="submit" class="danger">{{ T "Delete" }}</button>
+            </form>
+          {{ end }}
         </td>
       </tr>
     {{ end }}
@@ -42,27 +50,209 @@
   {{ else }}
     <p>{{ T "NoWorkBlocks" }}</p>
   {{ end }}
-  <h4>{{ T "AddManualBlock" }}</h4>
-  <form action="/day/{{ .Date }}/block" method="post">
-    <input type="hidden" name="csrf_token" value="{{ .CSRFToken }}">
-    <label>{{ T "Start" }} <input type="time" name="start" required></label>
-    <label>{{ T "End" }} <input type="time" name="end" required></label>
-    <label>{{ T "Note" }} <input type="text" name="note"></label>
-    <button type="submit">{{ T "Add" }}</button>
-  </form>
+  <button type="button" class="secondary" onclick="document.getElementById('manual-block-dialog').showModal()">
+    {{ T "AddManualBlock" }}
+  </button>
+
+  <dialog id="manual-block-dialog">
+    <h4>{{ T "AddManualBlock" }}</h4>
+    <form action="/day/{{ .Date }}/block" method="post">
+      <input type="hidden" name="csrf_token" value="{{ .CSRFToken }}">
+
+      <div class="time-row">
+        <label>{{ T "Start" }}</label>
+        <select name="start_hour" required>
+          <option value="00">00</option>
+          <option value="01">01</option>
+          <option value="02">02</option>
+          <option value="03">03</option>
+          <option value="04">04</option>
+          <option value="05">05</option>
+          <option value="06">06</option>
+          <option value="07">07</option>
+          <option value="08">08</option>
+          <option value="09" selected>09</option>
+          <option value="10">10</option>
+          <option value="11">11</option>
+          <option value="12">12</option>
+          <option value="13">13</option>
+          <option value="14">14</option>
+          <option value="15">15</option>
+          <option value="16">16</option>
+          <option value="17">17</option>
+          <option value="18">18</option>
+          <option value="19">19</option>
+          <option value="20">20</option>
+          <option value="21">21</option>
+          <option value="22">22</option>
+          <option value="23">23</option>
+        </select>
+        <span>:</span>
+        <select name="start_minute" required>
+          <option value="00" selected>00</option>
+          <option value="01">01</option>
+          <option value="02">02</option>
+          <option value="03">03</option>
+          <option value="04">04</option>
+          <option value="05">05</option>
+          <option value="06">06</option>
+          <option value="07">07</option>
+          <option value="08">08</option>
+          <option value="09">09</option>
+          <option value="10">10</option>
+          <option value="11">11</option>
+          <option value="12">12</option>
+          <option value="13">13</option>
+          <option value="14">14</option>
+          <option value="15">15</option>
+          <option value="16">16</option>
+          <option value="17">17</option>
+          <option value="18">18</option>
+          <option value="19">19</option>
+          <option value="20">20</option>
+          <option value="21">21</option>
+          <option value="22">22</option>
+          <option value="23">23</option>
+          <option value="24">24</option>
+          <option value="25">25</option>
+          <option value="26">26</option>
+          <option value="27">27</option>
+          <option value="28">28</option>
+          <option value="29">29</option>
+          <option value="30">30</option>
+          <option value="31">31</option>
+          <option value="32">32</option>
+          <option value="33">33</option>
+          <option value="34">34</option>
+          <option value="35">35</option>
+          <option value="36">36</option>
+          <option value="37">37</option>
+          <option value="38">38</option>
+          <option value="39">39</option>
+          <option value="40">40</option>
+          <option value="41">41</option>
+          <option value="42">42</option>
+          <option value="43">43</option>
+          <option value="44">44</option>
+          <option value="45">45</option>
+          <option value="46">46</option>
+          <option value="47">47</option>
+          <option value="48">48</option>
+          <option value="49">49</option>
+          <option value="50">50</option>
+          <option value="51">51</option>
+          <option value="52">52</option>
+          <option value="53">53</option>
+          <option value="54">54</option>
+          <option value="55">55</option>
+          <option value="56">56</option>
+          <option value="57">57</option>
+          <option value="58">58</option>
+          <option value="59">59</option>
+        </select>
+      </div>
+
+      <div class="time-row">
+        <label>{{ T "End" }}</label>
+        <select name="end_hour" required>
+          <option value="00">00</option>
+          <option value="01">01</option>
+          <option value="02">02</option>
+          <option value="03">03</option>
+          <option value="04">04</option>
+          <option value="05">05</option>
+          <option value="06">06</option>
+          <option value="07">07</option>
+          <option value="08">08</option>
+          <option value="09">09</option>
+          <option value="10">10</option>
+          <option value="11">11</option>
+          <option value="12">12</option>
+          <option value="13">13</option>
+          <option value="14">14</option>
+          <option value="15">15</option>
+          <option value="16">16</option>
+          <option value="17" selected>17</option>
+          <option value="18">18</option>
+          <option value="19">19</option>
+          <option value="20">20</option>
+          <option value="21">21</option>
+          <option value="22">22</option>
+          <option value="23">23</option>
+        </select>
+        <span>:</span>
+        <select name="end_minute" required>
+          <option value="00" selected>00</option>
+          <option value="01">01</option>
+          <option value="02">02</option>
+          <option value="03">03</option>
+          <option value="04">04</option>
+          <option value="05">05</option>
+          <option value="06">06</option>
+          <option value="07">07</option>
+          <option value="08">08</option>
+          <option value="09">09</option>
+          <option value="10">10</option>
+          <option value="11">11</option>
+          <option value="12">12</option>
+          <option value="13">13</option>
+          <option value="14">14</option>
+          <option value="15">15</option>
+          <option value="16">16</option>
+          <option value="17">17</option>
+          <option value="18">18</option>
+          <option value="19">19</option>
+          <option value="20">20</option>
+          <option value="21">21</option>
+          <option value="22">22</option>
+          <option value="23">23</option>
+          <option value="24">24</option>
+          <option value="25">25</option>
+          <option value="26">26</option>
+          <option value="27">27</option>
+          <option value="28">28</option>
+          <option value="29">29</option>
+          <option value="30">30</option>
+          <option value="31">31</option>
+          <option value="32">32</option>
+          <option value="33">33</option>
+          <option value="34">34</option>
+          <option value="35">35</option>
+          <option value="36">36</option>
+          <option value="37">37</option>
+          <option value="38">38</option>
+          <option value="39">39</option>
+          <option value="40">40</option>
+          <option value="41">41</option>
+          <option value="42">42</option>
+          <option value="43">43</option>
+          <option value="44">44</option>
+          <option value="45">45</option>
+          <option value="46">46</option>
+          <option value="47">47</option>
+          <option value="48">48</option>
+          <option value="49">49</option>
+          <option value="50">50</option>
+          <option value="51">51</option>
+          <option value="52">52</option>
+          <option value="53">53</option>
+          <option value="54">54</option>
+          <option value="55">55</option>
+          <option value="56">56</option>
+          <option value="57">57</option>
+          <option value="58">58</option>
+          <option value="59">59</option>
+        </select>
+      </div>
+
+      <label>{{ T "Note" }} <input type="text" name="note"></label>
+
+      <div class="form-actions">
+        <button type="button" class="secondary" onclick="this.closest('dialog').close()">{{ T "Cancel" }}</button>
+        <button type="submit">{{ T "Add" }}</button>
+      </div>
+    </form>
+  </dialog>
 </div>
 
-<div class="card">
-  <h3>{{ T "Booking" }}</h3>
-  <form class="inline" action="/day/{{ .Date }}/book" method="post">
-    <input type="hidden" name="csrf_token" value="{{ .CSRFToken }}">
-    <input type="hidden" name="booked" value="true">
-    <button type="submit">{{ T "MarkDayBooked" }}</button>
-  </form>
-  <form class="inline" action="/day/{{ .Date }}/book" method="post">
-    <input type="hidden" name="csrf_token" value="{{ .CSRFToken }}">
-    <input type="hidden" name="booked" value="false">
-    <button type="submit" class="secondary">{{ T "MarkDayNotBooked" }}</button>
-  </form>
-</div>
 {{ end }}

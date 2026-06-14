@@ -1,0 +1,17 @@
+{{ define "today_status" }}
+<div class="card" hx-get="/today/status" hx-trigger="every 10s" hx-swap="outerHTML">
+  <h2>{{ Tf "TodayDate" (dict "Date" (dateShort .DateObj)) }}</h2>
+  <p>
+    {{ T "Status" }}:
+    <span class="status-badge status-{{ .Status }}">{{ statusLabel .Status }}</span>
+  </p>
+  {{ if .CurrentBlockStart }}
+    <p>{{ Tf "CurrentBlockStarted" (dict "Time" (.CurrentBlockStart.Format "15:04") "Minutes" .RunningMinutes) }}</p>
+  {{ end }}
+  <p>{{ T "Worked" }}: {{ formatMinutes .WorkedMinutes }} &middot; {{ T "Pause" }}: {{ formatMinutes .PauseMinutes }}</p>
+  <p>{{ T "Booking" }}: <span class="{{ if .Booked }}booked{{ else }}unbooked{{ end }}">{{ bookedLabel .Booked }}</span></p>
+  {{ if .ChangedAfterBooking }}
+    <p class="changed">{{ T "ChangedAfterBooking" }}</p>
+  {{ end }}
+</div>
+{{ end }}

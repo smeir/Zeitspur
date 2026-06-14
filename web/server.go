@@ -61,7 +61,11 @@ func NewServer(db *sql.DB, cfg config.Config, paths config.Paths, provider activ
 		templates[locale] = make(map[string]*template.Template)
 		funcs := templateFuncs(catalog, locale)
 		for _, name := range pageNames {
-			tmpl, err := template.New("").Funcs(funcs).ParseFS(assets, "templates/layout.html", "templates/"+name+".html")
+			files := []string{"templates/layout.html", "templates/" + name + ".html"}
+			if name == "today" {
+				files = append(files, "templates/today_status.html")
+			}
+			tmpl, err := template.New("").Funcs(funcs).ParseFS(assets, files...)
 			if err != nil {
 				return nil, fmt.Errorf("parse template %s/%s: %w", locale, name, err)
 			}
@@ -88,9 +92,10 @@ func NewServer(db *sql.DB, cfg config.Config, paths config.Paths, provider activ
 	r.Get("/", s.handleToday)
 	r.Get("/today/status", s.handleTodayStatus)
 	r.Get("/day/{date}", s.handleDay)
-	r.Post("/day/{date}/book", s.handleDayBook)
 	r.Post("/day/{date}/block", s.handleDayBlock)
 	r.Post("/day/{date}/block/{id}/ignore", s.handleBlockIgnore)
+	r.Post("/day/{date}/block/{id}/unignore", s.handleBlockUnignore)
+	r.Post("/day/{date}/block/{id}/delete", s.handleBlockDelete)
 
 	r.Get("/week", s.handleWeek)
 	r.Get("/month", s.handleMonth)
@@ -197,6 +202,10 @@ func csrfToken(r *http.Request) string {
 }
 
 func (s *Server) render(w http.ResponseWriter, r *http.Request, name string, data map[string]any, status int) {
+	s.renderBlock(w, r, name, "content", data, status)
+}
+
+func (s *Server) renderBlock(w http.ResponseWriter, r *http.Request, name, block string, data map[string]any, status int) {
 	locale := s.locale()
 	data["CSRFToken"] = csrfToken(r)
 	data["Lang"] = string(locale)
@@ -209,7 +218,7 @@ func (s *Server) render(w http.ResponseWriter, r *http.Request, name string, dat
 		return
 	}
 	var buf bytes.Buffer
-	if err := page.ExecuteTemplate(&buf, "content", data); err != nil {
+	if err := page.ExecuteTemplate(&buf, block, data); err != nil {
 		slog.Error("template render failed", "error", err)
 		http.Error(w, "template render failed", http.StatusInternalServerError)
 		return
