@@ -31,3 +31,6 @@ func (m *MockProvider) SetState(state ActivityState) {
 func (m *MockProvider) SetError(err error) {
 	m.err = err
 }
+
+// Close is a no-op; the mock holds no resources.
+func (m *MockProvider) Close() error { return nil }

@@ -9,6 +9,10 @@ import (
 	"github.com/godbus/dbus/v5"
 )
 
+// dbusProbeTimeout bounds the construction-time capability probe so startup
+// cannot hang on an unresponsive D-Bus service.
+const dbusProbeTimeout = 2 * time.Second
+
 // GNOMEProvider queries GNOME/Mutter over D-Bus for idle and lock state.
 type GNOMEProvider struct {
 	conn          *dbus.Conn
@@ -17,12 +21,25 @@ type GNOMEProvider struct {
 
 // NewGNOMEProvider connects to the session bus and returns a provider.
 // idleThreshold is the duration after which the user is considered idle.
+//
+// Connecting to the session bus succeeds on virtually every desktop, so it is
+// not a usable signal on its own. We probe the GNOME/Mutter idle interface and
+// return an error when it is absent, letting callers fall back to another
+// provider (e.g. on KDE).
 func NewGNOMEProvider(idleThreshold time.Duration) (*GNOMEProvider, error) {
 	conn, err := dbus.ConnectSessionBus()
 	if err != nil {
 		return nil, fmt.Errorf("connect session bus: %w", err)
 	}
-	return &GNOMEProvider{conn: conn, idleThreshold: idleThreshold}, nil
+	p := &GNOMEProvider{conn: conn, idleThreshold: idleThreshold}
+
+	ctx, cancel := context.WithTimeout(context.Background(), dbusProbeTimeout)
+	defer cancel()
+	if _, err := p.idleTime(ctx); err != nil {
+		_ = conn.Close()
+		return nil, fmt.Errorf("gnome idle monitor unavailable: %w", err)
+	}
+	return p, nil
 }
 
 // Name returns the provider name.

@@ -18,6 +18,9 @@ const (
 type ActivityProvider interface {
 	Name() string
 	CurrentState(ctx context.Context) (ActivityState, error)
+	// Close releases any resources held by the provider (e.g. a D-Bus
+	// connection). It is safe to call on every provider implementation.
+	Close() error
 }
 
 // EventType values stored in the activity_events table.

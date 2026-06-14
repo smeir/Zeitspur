@@ -101,8 +101,12 @@ func setup() (config.Config, config.Paths, *sql.DB, activity.ActivityProvider, e
 	var provider activity.ActivityProvider
 	provider, err = activity.NewGNOMEProvider(cfg.IdleThreshold())
 	if err != nil {
-		slog.Warn("GNOME D-Bus provider unavailable; falling back to mock", "error", err)
-		provider = activity.NewMockProvider(activity.ActivityUnknown)
+		slog.Warn("GNOME D-Bus provider unavailable; trying freedesktop", "error", err)
+		provider, err = activity.NewFreedesktopProvider(cfg.IdleThreshold())
+		if err != nil {
+			slog.Warn("freedesktop D-Bus provider unavailable; falling back to mock", "error", err)
+			provider = activity.NewMockProvider(activity.ActivityUnknown)
+		}
 	}
 
 	return cfg, paths, db, provider, nil
@@ -114,6 +118,7 @@ func runServe() error {
 		return err
 	}
 	defer db.Close()
+	defer provider.Close()
 
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
@@ -166,6 +171,7 @@ func runStatus() error {
 		return err
 	}
 	defer db.Close()
+	defer provider.Close()
 
 	ctx := context.Background()
 	date := time.Now().In(time.Local).Format("2006-01-02")

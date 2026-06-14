@@ -138,8 +138,11 @@ sequenceDiagram
 
 | Provider | File | Behaviour |
 | --- | --- | --- |
-| GNOME/Mutter | `internal/activity/provider.go` | Queries `org.gnome.Mutter.IdleMonitor` for idle time and `org.gnome.desktop.screensaver` / `org.freedesktop.ScreenSaver` for lock state. |
+| GNOME/Mutter | `internal/activity/gnome_provider.go` | Queries `org.gnome.Mutter.IdleMonitor` for idle time and `org.gnome.desktop.screensaver` / `org.freedesktop.ScreenSaver` for lock state. |
+| Freedesktop | `internal/activity/freedesktop_provider.go` | Generic fallback that queries `org.freedesktop.ScreenSaver` and `org.kde.screensaver` for idle time and lock state, covering KDE and other freedesktop-compatible desktops. |
 | Mock | `internal/activity/mock.go` | Programmable state for tests and fallback when D-Bus is unavailable. |
+
+At startup the CLI tries providers in the order GNOME → Freedesktop → Mock, so KDE and other freedesktop-compatible desktops are used automatically when the GNOME-specific interfaces are not present.
 
 The engine (`internal/activity/engine.go`) runs a ticker at `poll_interval`. On each tick it asks the provider for the current state and records an event only when the state changes:
 
