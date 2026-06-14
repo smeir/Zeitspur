@@ -8,7 +8,7 @@
   {{ if .CurrentBlockStart }}
     <p>{{ Tf "CurrentBlockStarted" (dict "Time" (.CurrentBlockStart.Format "15:04") "Minutes" .RunningMinutes) }}</p>
   {{ end }}
-  <p>{{ T "Worked" }}: {{ Tf "WorkedMinutes" (dict "Minutes" .WorkedMinutes) }} &middot; {{ T "Pause" }}: {{ Tf "PauseMinutes" (dict "Minutes" .PauseMinutes) }}</p>
+  <p>{{ T "Worked" }}: {{ formatMinutes .WorkedMinutes }} &middot; {{ T "Pause" }}: {{ formatMinutes .PauseMinutes }}</p>
   <p>{{ T "Booking" }}: <span class="{{ if .Booked }}booked{{ else }}unbooked{{ end }}">{{ bookedLabel .Booked }}</span></p>
   {{ if .ChangedAfterBooking }}
     <p class="changed">{{ T "ChangedAfterBooking" }}</p>

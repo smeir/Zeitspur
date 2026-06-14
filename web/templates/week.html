@@ -1,7 +1,7 @@
 {{ define "content" }}
 <div class="card">
   <h2>{{ Tf "WeekRange" (dict "Start" (dateShort .WeekStart) "End" (dateShort .WeekEnd)) }}</h2>
-  <p>{{ T "TotalTracked" }}: {{ Tf "WorkedMinutes" (dict "Minutes" .TotalMinutes) }} &middot; {{ T "BookedDays" }}: {{ .BookedDays }} &middot; {{ T "UnbookedDays" }}: {{ .UnbookedDays }}</p>
+  <p>{{ T "TotalTracked" }}: {{ formatMinutes .TotalMinutes }} &middot; {{ T "BookedDays" }}: {{ .BookedDays }} &middot; {{ T "UnbookedDays" }}: {{ .UnbookedDays }}</p>
   <table>
     <thead>
       <tr><th>{{ T "Day" }}</th><th>{{ T "Worked" }}</th><th>{{ T "Pause" }}</th><th>{{ T "Status" }}</th><th>{{ T "Blocks" }}</th><th>{{ T "Changed" }}</th></tr>
@@ -10,8 +10,8 @@
     {{ range .Days }}
       <tr>
         <td><a href="/day/{{ .Date }}">{{ dateShort .DateObj }}</a></td>
-        <td>{{ Tf "WorkedMinutes" (dict "Minutes" .WorkedMinutes) }}</td>
-        <td>{{ Tf "PauseMinutes" (dict "Minutes" .PauseMinutes) }}</td>
+        <td>{{ formatMinutes .WorkedMinutes }}</td>
+        <td>{{ formatMinutes .PauseMinutes }}</td>
         <td class="{{ if .Booked }}booked{{ else }}unbooked{{ end }}">{{ bookedLabel .Booked }}</td>
         <td>{{ .BlockCount }}</td>
         <td>{{ yesNo .ChangedAfterBooking }}</td>

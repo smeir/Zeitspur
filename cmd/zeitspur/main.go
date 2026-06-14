@@ -19,6 +19,7 @@ import (
 	"github.com/smeir/zeitspur/internal/database"
 	"github.com/smeir/zeitspur/internal/systemd"
 	"github.com/smeir/zeitspur/internal/timeline"
+	"github.com/smeir/zeitspur/internal/timeutil"
 	"github.com/smeir/zeitspur/web"
 )
 
@@ -130,7 +131,7 @@ func runServe() error {
 	defer cleanup()
 
 	clk := clock.System{}
-	engine := activity.NewEngine(db, provider, clk, cfg.IdleThreshold(), cfg.TailCredit(), cfg.PollInterval())
+	engine := activity.NewEngine(db, provider, clk, cfg.IdleThreshold(), cfg.PollInterval())
 
 	go func() {
 		if err := engine.Run(ctx); err != nil && err != context.Canceled {
@@ -197,8 +198,8 @@ func runStatus() error {
 
 	fmt.Printf("Status:        %s\n", state)
 	fmt.Printf("Today:         %s\n", date)
-	fmt.Printf("Worked:        %d min\n", sum.WorkedMinutes)
-	fmt.Printf("Pause:         %d min\n", sum.PauseMinutes)
+	fmt.Printf("Worked:        %s\n", timeutil.FormatMinutes(sum.WorkedMinutes))
+	fmt.Printf("Pause:         %s\n", timeutil.FormatMinutes(sum.PauseMinutes))
 	fmt.Printf("Booked:        %v\n", status.Booked)
 	fmt.Printf("Database:      %s\n", paths.DBFile)
 	fmt.Printf("Config:        %s\n", paths.ConfigFile)

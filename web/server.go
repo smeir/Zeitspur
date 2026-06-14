@@ -22,6 +22,7 @@ import (
 	"github.com/smeir/zeitspur/internal/clock"
 	"github.com/smeir/zeitspur/internal/config"
 	"github.com/smeir/zeitspur/internal/i18n"
+	"github.com/smeir/zeitspur/internal/timeutil"
 )
 
 //go:embed templates/*.html static/*
@@ -293,6 +294,9 @@ func templateFuncs(catalog i18n.Catalog, locale i18n.Locale) template.FuncMap {
 		},
 		"month": func(t time.Time) string {
 			return i18n.MonthName(t, locale)
+		},
+		"formatMinutes": func(minutes int) string {
+			return timeutil.FormatMinutes(minutes)
 		},
 		"yesNo": func(v bool) string {
 			if v {

@@ -62,7 +62,7 @@ var rules = []rule{
 	},
 	{
 		name:            "infra",
-		sourcePrefixes:  []string{"internal/clock", "internal/config", "internal/database", "internal/i18n", "internal/systemd"},
+		sourcePrefixes:  []string{"internal/clock", "internal/config", "internal/database", "internal/i18n", "internal/systemd", "internal/timeutil"},
 		allowedPrefixes: []string{
 			// Infrastructure packages may only depend on the standard library
 			// and external dependencies. They must not import other internal
@@ -80,6 +80,7 @@ var rules = []rule{
 			"internal/config",
 			"internal/database",
 			"internal/i18n",
+			"internal/timeutil",
 		},
 	},
 }

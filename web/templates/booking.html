@@ -41,7 +41,7 @@
         <tr>
           <td><input type="checkbox" class="day-check" name="dates" value="{{ .Date }}"></td>
           <td>{{ dateShort .DateObj }}</td>
-          <td>{{ Tf "WorkedMinutes" (dict "Minutes" .WorkedMinutes) }}</td>
+          <td>{{ formatMinutes .WorkedMinutes }}</td>
           <td class="{{ if .Booked }}booked{{ else }}unbooked{{ end }}">{{ bookedLabel .Booked }}</td>
           <td>{{ yesNo .ChangedAfterBooking }}</td>
         </tr>

@@ -14,7 +14,7 @@
           <div class="date">{{ .DayNum }}</div>
           {{ if .HasWork }}
             <div class="bar" style="width: {{ .BarWidth }}%;"></div>
-            <div class="minutes">{{ .WorkedMinutes }}m</div>
+            <div class="minutes">{{ formatMinutes .WorkedMinutes }}</div>
           {{ end }}
           {{ if .Booked }}<span class="booked">B</span>{{ end }}
           {{ if .ChangedAfterBooking }}<span class="changed">!</span>{{ end }}
