@@ -7,7 +7,7 @@ It is distributed as a single Go binary containing the complete web UI. No Node.
 ## Features
 
 - Runs automatically in the background as a systemd user service.
-- Detects user activity and inactivity using GNOME/Mutter D-Bus.
+- Detects user activity and inactivity using GNOME/Mutter or freedesktop D-Bus.
 - Calculates likely working periods and pauses for each day.
 - Provides local day, week, and month views.
 - Allows each day to be marked as booked or not booked.
@@ -64,7 +64,7 @@ zeitspur/
 - Server-rendered HTML with `html/template`
 - HTMX for interactive UI actions
 - SQLite via `modernc.org/sqlite` (pure Go, no CGO)
-- D-Bus GNOME/Mutter provider
+- D-Bus GNOME/Mutter and freedesktop providers
 
 ## Build
 
@@ -180,13 +180,13 @@ zeitspur.db-shm
 
 ### D-Bus / GNOME
 
-If the status shows `unknown`, Zeitspur could not connect to the session D-Bus or GNOME/Mutter was not available. Check that:
+If the status shows `unknown`, Zeitspur could not connect to the session D-Bus or no supported desktop provider was available. Check that:
 
-- You are running inside a GNOME graphical session.
+- You are running inside a graphical session that exposes `org.gnome.Mutter.IdleMonitor`, `org.freedesktop.ScreenSaver`, or `org.kde.screensaver`.
 - The `DBUS_SESSION_BUS_ADDRESS` environment variable is set.
-- `d-feet` or `busctl --user` can see `org.gnome.Mutter.IdleMonitor`.
+- `d-feet` or `busctl --user` can see the relevant D-Bus service.
 
-On non-GNOME desktops the collector falls back to a mock provider and does not record activity automatically.
+If no supported provider is available, the collector falls back to a mock provider and does not record activity automatically.
 
 ### Service fails to start
 
