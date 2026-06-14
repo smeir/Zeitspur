@@ -44,7 +44,8 @@ zeitspur/
 │   ├── database/          SQLite connection and embedded migrations
 │   ├── systemd/           user service installation
 │   ├── timeline/          working-time calculation (day/range summaries)
-│   └── clock/             testable clock abstraction
+│   ├── clock/             testable clock abstraction
+│   └── timeutil/          small time-formatting helpers
 ├── web/                   embedded HTML templates, CSS, HTMX, HTTP handlers
 └── docs/                  documentation and reports
 ```
@@ -69,6 +70,10 @@ When making changes that affect any of those areas, update `docs/architecture.md
 - Adding state-changing HTTP endpoints or altering security boundaries.
 - Changing the privacy model or what data is captured/stored.
 
+## Preserved reference documents
+
+`docs/init-prompt.md` is the original project specification and must never be modified. Treat it as read-only historical context; keep the actual behavior documentation in `docs/architecture.md`, the README, and this file.
+
 ## Build, test & lint
 
 All standard tasks run through the `Makefile`:
@@ -87,6 +92,7 @@ make clean   # remove the binary, clear the test cache
 1. Run `make lint` — the code must be `gofmt`-clean and `go vet`-clean.
 2. `make test` must pass.
 3. For concurrent code, also run `go test -race ./...`.
+4. Run `make install` to build and (re-)install the local systemd user service so changes take effect.
 
 ## Code conventions
 

@@ -20,6 +20,9 @@ lint: fmt vet boundaries
 run: build
 	./$(BINARY) serve
 
+install: build
+	./$(BINARY) install
+
 clean:
 	rm -f $(BINARY) $(BINARY)-linux-*
 	go clean -testcache
