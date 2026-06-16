@@ -29,22 +29,19 @@ type Closure struct {
 
 // ClosureDay is a snapshot of a single day at closure time.
 type ClosureDay struct {
-	ID                  int
-	ClosureID           int
-	WorkDate            string
-	DateObj             time.Time
-	BookedSnapshot      bool
-	TrackedMinutes      int
-	DayRevisionSnapshot int
+	ID             int
+	ClosureID      int
+	WorkDate       string
+	DateObj        time.Time
+	BookedSnapshot bool
+	TrackedMinutes int
 }
 
 // DaySummary is used to compute a closure.
 type DaySummary struct {
-	Date            string
-	Booked          bool
-	BookingRevision int
-	CurrentRevision int
-	TrackedMinutes  int
+	Date           string
+	Booked         bool
+	TrackedMinutes int
 }
 
 // Repository provides persistence for closures.
@@ -160,8 +157,8 @@ func (r *Repository) Create(ctx context.Context, bookingDay string, days []DaySu
 		_, err := tx.ExecContext(ctx, `
 			INSERT INTO booking_closure_days
 				(closure_id, work_date, booked_snapshot, tracked_minutes_snapshot, day_revision_snapshot)
-			VALUES (?, ?, ?, ?, ?)
-		`, closureID, d.Date, d.Booked, d.TrackedMinutes, d.CurrentRevision)
+			VALUES (?, ?, ?, ?, 0)
+		`, closureID, d.Date, d.Booked, d.TrackedMinutes)
 		if err != nil {
 			return nil, fmt.Errorf("insert closure day: %w", err)
 		}
@@ -244,7 +241,7 @@ func (r *Repository) PeriodStart(ctx context.Context, bookingDay time.Time) (tim
 // HasDifferenceSinceClosure reports whether current data differs from the snapshot.
 func (r *Repository) HasDifferenceSinceClosure(ctx context.Context, closureID int, statuses []*booking.DayStatus) (bool, error) {
 	rows, err := r.db.QueryContext(ctx, `
-		SELECT work_date, booked_snapshot, day_revision_snapshot
+		SELECT work_date, booked_snapshot
 		FROM booking_closure_days
 		WHERE closure_id = ?
 	`, closureID)
@@ -254,20 +251,17 @@ func (r *Repository) HasDifferenceSinceClosure(ctx context.Context, closureID in
 	defer rows.Close()
 
 	snapshot := make(map[string]struct {
-		booked   bool
-		revision int
+		booked bool
 	})
 	for rows.Next() {
 		var date string
 		var booked bool
-		var rev int
-		if err := rows.Scan(&date, &booked, &rev); err != nil {
+		if err := rows.Scan(&date, &booked); err != nil {
 			return false, err
 		}
 		snapshot[date] = struct {
-			booked   bool
-			revision int
-		}{booked: booked, revision: rev}
+			booked bool
+		}{booked: booked}
 	}
 
 	for _, ds := range statuses {
@@ -275,7 +269,7 @@ func (r *Repository) HasDifferenceSinceClosure(ctx context.Context, closureID in
 		if !ok {
 			return true, nil
 		}
-		if s.booked != ds.Booked || s.revision != ds.CurrentRevision {
+		if s.booked != ds.Booked {
 			return true, nil
 		}
 	}
@@ -302,7 +296,7 @@ func (r *Repository) scanClosure(row interface{ Scan(...any) error }) (*Closure,
 
 func (r *Repository) listDays(ctx context.Context, closureID int) ([]ClosureDay, error) {
 	rows, err := r.db.QueryContext(ctx, `
-		SELECT id, closure_id, work_date, booked_snapshot, tracked_minutes_snapshot, day_revision_snapshot
+		SELECT id, closure_id, work_date, booked_snapshot, tracked_minutes_snapshot
 		FROM booking_closure_days
 		WHERE closure_id = ?
 		ORDER BY work_date ASC
@@ -315,7 +309,7 @@ func (r *Repository) listDays(ctx context.Context, closureID int) ([]ClosureDay,
 	var days []ClosureDay
 	for rows.Next() {
 		var d ClosureDay
-		if err := rows.Scan(&d.ID, &d.ClosureID, &d.WorkDate, &d.BookedSnapshot, &d.TrackedMinutes, &d.DayRevisionSnapshot); err != nil {
+		if err := rows.Scan(&d.ID, &d.ClosureID, &d.WorkDate, &d.BookedSnapshot, &d.TrackedMinutes); err != nil {
 			return nil, err
 		}
 		d.DateObj, _ = time.Parse("2006-01-02", d.WorkDate)

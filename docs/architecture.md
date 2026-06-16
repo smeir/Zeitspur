@@ -183,12 +183,9 @@ flowchart LR
 - `WorkedMinutes` is the sum of active block durations for the day.
 - `PauseMinutes` is the sum of gaps between active blocks.
 - `TotalMinutes` is `WorkedMinutes + PauseMinutes`.
-- `ChangedAfterBooking` is true when the day is booked but the current revision is newer than the booking revision.
-
 `booking.Repository` (`internal/booking/repository.go`) manages `day_status` and the singleton `booking_settings` row:
 
-- `SetBooked` toggles the booked flag, records `booked_at`, and bumps both `booking_revision` and `current_revision`.
-- `BumpRevision` increments `current_revision` when a work block is manually added or ignored, so the UI can warn that data changed after booking.
+- `SetBooked` toggles the booked flag and records `booked_at`.
 - `SetBookingDay` / `ClearBookingDay` configure the manual Booking Day that drives the open booking period.
 
 ## Closure Lifecycle

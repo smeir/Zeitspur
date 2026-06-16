@@ -10,8 +10,5 @@
   {{ end }}
   <p>{{ T "Worked" }}: {{ formatMinutes .WorkedMinutes }} &middot; {{ T "Pause" }}: {{ formatMinutes .PauseMinutes }}</p>
   <p>{{ T "Booking" }}: <span class="{{ if .Booked }}booked{{ else }}unbooked{{ end }}">{{ bookedLabel .Booked }}</span></p>
-  {{ if .ChangedAfterBooking }}
-    <p class="changed">{{ T "ChangedAfterBooking" }}</p>
+  </div>
   {{ end }}
-</div>
-{{ end }}

@@ -56,7 +56,6 @@ func NewCatalog() Catalog {
 			"Booking":             "Buchung",
 			"Booked":              "gebucht",
 			"NotBooked":           "nicht gebucht",
-			"ChangedAfterBooking": "Achtung: Dieser Tag wurde nach der Buchung geändert.",
 			"WorkBlocks":          "Arbeitsblöcke",
 			"NoWorkBlocks":        "Noch keine Arbeitsblöcke aufgezeichnet.",
 			"Start":               "Start",
@@ -88,7 +87,6 @@ func NewCatalog() Catalog {
 			"UnbookedDays": "Ungebuchte Tage",
 			"Day":          "Tag",
 			"Blocks":       "Blöcke",
-			"Changed":      "Geändert",
 			"Yes":          "ja",
 			"No":           "nein",
 

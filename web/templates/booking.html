@@ -34,17 +34,16 @@
     <input type="hidden" name="csrf_token" value="{{ .CSRFToken }}">
     <table>
       <thead>
-        <tr><th><input type="checkbox" id="select-all" onclick="document.querySelectorAll('.day-check').forEach(c=>c.checked=this.checked)"></th><th>{{ T "Day" }}</th><th>{{ T "Worked" }}</th><th>{{ T "Status" }}</th><th>{{ T "Changed" }}</th></tr>
+       <tr><th><input type="checkbox" id="select-all" onclick="document.querySelectorAll('.day-check').forEach(c=>c.checked=this.checked)"></th><th>{{ T "Day" }}</th><th>{{ T "Worked" }}</th><th>{{ T "Status" }}</th></tr>
       </thead>
       <tbody>
       {{ range .Days }}
-        <tr>
-          <td><input type="checkbox" class="day-check" name="dates" value="{{ .Date }}"></td>
-          <td>{{ dateShort .DateObj }}</td>
-          <td>{{ formatMinutes .WorkedMinutes }}</td>
-          <td class="{{ if .Booked }}booked{{ else }}unbooked{{ end }}">{{ bookedLabel .Booked }}</td>
-          <td>{{ yesNo .ChangedAfterBooking }}</td>
-        </tr>
+       <tr>
+         <td><input type="checkbox" class="day-check" name="dates" value="{{ .Date }}"></td>
+         <td>{{ dateShort .DateObj }}</td>
+         <td>{{ formatMinutes .WorkedMinutes }}</td>
+         <td class="{{ if .Booked }}booked{{ else }}unbooked{{ end }}">{{ bookedLabel .Booked }}</td>
+       </tr>
       {{ end }}
       </tbody>
     </table>

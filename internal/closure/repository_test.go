@@ -42,8 +42,8 @@ func TestRepository_CreateAndSnapshot(t *testing.T) {
 	_ = br.SetBooked(context.Background(), "2026-06-11", false)
 
 	days := []DaySummary{
-		{Date: "2026-06-10", Booked: true, CurrentRevision: 1, TrackedMinutes: 480},
-		{Date: "2026-06-11", Booked: false, CurrentRevision: 1, TrackedMinutes: 240},
+		{Date: "2026-06-10", Booked: true, TrackedMinutes: 480},
+		{Date: "2026-06-11", Booked: false, TrackedMinutes: 240},
 	}
 
 	cr := NewRepository(db)
@@ -71,7 +71,7 @@ func TestRepository_DifferenceDetection(t *testing.T) {
 	_ = br.SetBooked(context.Background(), "2026-06-10", true)
 
 	days := []DaySummary{
-		{Date: "2026-06-10", Booked: true, CurrentRevision: 1, TrackedMinutes: 480},
+		{Date: "2026-06-10", Booked: true, TrackedMinutes: 480},
 	}
 
 	cr := NewRepository(db)
@@ -119,8 +119,8 @@ func TestRepository_PeriodStart_AfterLastClosure(t *testing.T) {
 
 	cr := NewRepository(db)
 	_, err := cr.Create(context.Background(), "2026-06-10", []DaySummary{
-		{Date: "2026-06-01", Booked: true, CurrentRevision: 1, TrackedMinutes: 480},
-		{Date: "2026-06-10", Booked: true, CurrentRevision: 1, TrackedMinutes: 480},
+		{Date: "2026-06-01", Booked: true, TrackedMinutes: 480},
+		{Date: "2026-06-10", Booked: true, TrackedMinutes: 480},
 	})
 	if err != nil {
 		t.Fatalf("create closure: %v", err)

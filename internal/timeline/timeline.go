@@ -10,16 +10,13 @@ import (
 
 // DaySummary represents the aggregated data for a single calendar day.
 type DaySummary struct {
-	Date                string
-	DateObj             time.Time
-	WorkedMinutes       int
-	PauseMinutes        int
-	TotalMinutes        int
-	BlockCount          int
-	Booked              bool
-	BookingRevision     int
-	CurrentRevision     int
-	ChangedAfterBooking bool
+	Date          string
+	DateObj       time.Time
+	WorkedMinutes int
+	PauseMinutes  int
+	TotalMinutes  int
+	BlockCount    int
+	Booked        bool
 }
 
 // Service computes timeline summaries.
@@ -53,7 +50,7 @@ func (s *Service) Range(ctx context.Context, start, end string) ([]*DaySummary, 
 func (s *Service) summarize(ctx context.Context, start, end string) ([]*DaySummary, error) {
 	// Load day status.
 	rows, err := s.db.QueryContext(ctx, `
-		SELECT work_date, booked, booking_revision, current_revision
+		SELECT work_date, booked
 		FROM day_status
 		WHERE work_date >= ? AND work_date <= ?
 		ORDER BY work_date ASC
@@ -66,7 +63,7 @@ func (s *Service) summarize(ctx context.Context, start, end string) ([]*DaySumma
 	statusByDate := make(map[string]*DaySummary)
 	for rows.Next() {
 		var ds DaySummary
-		if err := rows.Scan(&ds.Date, &ds.Booked, &ds.BookingRevision, &ds.CurrentRevision); err != nil {
+		if err := rows.Scan(&ds.Date, &ds.Booked); err != nil {
 			return nil, err
 		}
 		ds.DateObj, _ = time.Parse("2006-01-02", ds.Date)
@@ -147,9 +144,6 @@ func (s *Service) summarize(ctx context.Context, start, end string) ([]*DaySumma
 			}
 		}
 		ds.TotalMinutes = ds.WorkedMinutes + ds.PauseMinutes
-		if ds.BookingRevision < ds.CurrentRevision {
-			ds.ChangedAfterBooking = ds.Booked
-		}
 	}
 
 	// Sort result.

@@ -71,16 +71,15 @@ func (s *Server) dayData(r *http.Request, date string) map[string]any {
 	dateObj, _ := time.Parse("2006-01-02", date)
 
 	return map[string]any{
-		"Date":                date,
-		"DateObj":             dateObj,
-		"Status":              string(state),
-		"CurrentBlockStart":   running,
-		"RunningMinutes":      runningMinutes,
-		"WorkedMinutes":       sum.WorkedMinutes,
-		"PauseMinutes":        sum.PauseMinutes,
-		"Booked":              status.Booked,
-		"ChangedAfterBooking": status.Booked && status.BookingRevision < status.CurrentRevision,
-		"Blocks":              blocks,
+		"Date":              date,
+		"DateObj":           dateObj,
+		"Status":            string(state),
+		"CurrentBlockStart": running,
+		"RunningMinutes":    runningMinutes,
+		"WorkedMinutes":     sum.WorkedMinutes,
+		"PauseMinutes":      sum.PauseMinutes,
+		"Booked":            status.Booked,
+		"Blocks":            blocks,
 	}
 }
 
@@ -207,8 +206,6 @@ func (s *Server) handleDayBlock(w http.ResponseWriter, r *http.Request) {
 		slog.Error("insert manual block failed", "error", err)
 	}
 
-	br := booking.NewRepository(s.db)
-	_ = br.BumpRevision(r.Context(), date)
 	http.Redirect(w, r, "/day/"+date, http.StatusFound)
 }
 
@@ -218,8 +215,6 @@ func (s *Server) handleBlockIgnore(w http.ResponseWriter, r *http.Request) {
 	started := r.FormValue("started_at")
 	ended := r.FormValue("ended_at")
 	s.updateBlockStatus(r.Context(), date, idStr, started, ended, "ignored", "active")
-	br := booking.NewRepository(s.db)
-	_ = br.BumpRevision(r.Context(), date)
 	http.Redirect(w, r, "/day/"+date, http.StatusFound)
 }
 
@@ -229,8 +224,6 @@ func (s *Server) handleBlockUnignore(w http.ResponseWriter, r *http.Request) {
 	started := r.FormValue("started_at")
 	ended := r.FormValue("ended_at")
 	s.updateBlockStatus(r.Context(), date, idStr, started, ended, "active", "ignored")
-	br := booking.NewRepository(s.db)
-	_ = br.BumpRevision(r.Context(), date)
 	http.Redirect(w, r, "/day/"+date, http.StatusFound)
 }
 
@@ -254,8 +247,6 @@ func (s *Server) handleBlockDelete(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 	}
-	br := booking.NewRepository(s.db)
-	_ = br.BumpRevision(r.Context(), date)
 	http.Redirect(w, r, "/day/"+date, http.StatusFound)
 }
 
@@ -337,14 +328,13 @@ func (s *Server) handleMonth(w http.ResponseWriter, r *http.Request) {
 	}
 
 	type cell struct {
-		Empty               bool
-		Date                string
-		DayNum              int
-		WorkedMinutes       int
-		HasWork             bool
-		BarWidth            int
-		Booked              bool
-		ChangedAfterBooking bool
+		Empty         bool
+		Date          string
+		DayNum        int
+		WorkedMinutes int
+		HasWork       bool
+		BarWidth      int
+		Booked        bool
 	}
 
 	var cells []cell
@@ -358,21 +348,18 @@ func (s *Server) handleMonth(w http.ResponseWriter, r *http.Request) {
 		sum := dayMap[dateStr]
 		worked := 0
 		booked := false
-		changed := false
 		if sum != nil {
 			worked = sum.WorkedMinutes
 			booked = sum.Booked
-			changed = sum.ChangedAfterBooking
 		}
 		cells = append(cells, cell{
-			Empty:               false,
-			Date:                dateStr,
-			DayNum:              d.Day(),
-			WorkedMinutes:       worked,
-			HasWork:             worked > 0,
-			BarWidth:            (worked * 100) / maxWork,
-			Booked:              booked,
-			ChangedAfterBooking: changed,
+			Empty:         false,
+			Date:          dateStr,
+			DayNum:        d.Day(),
+			WorkedMinutes: worked,
+			HasWork:       worked > 0,
+			BarWidth:      (worked * 100) / maxWork,
+			Booked:        booked,
 		})
 	}
 
@@ -479,11 +466,9 @@ func (s *Server) handleClosePreview(w http.ResponseWriter, r *http.Request) {
 	var tracked, booked, unbooked, total int
 	for _, d := range days {
 		summaries = append(summaries, closure.DaySummary{
-			Date:            d.Date,
-			Booked:          d.Booked,
-			BookingRevision: d.BookingRevision,
-			CurrentRevision: d.CurrentRevision,
-			TrackedMinutes:  d.WorkedMinutes,
+			Date:           d.Date,
+			Booked:         d.Booked,
+			TrackedMinutes: d.WorkedMinutes,
 		})
 		tracked++
 		total += d.WorkedMinutes
@@ -548,11 +533,9 @@ func (s *Server) handleClose(w http.ResponseWriter, r *http.Request) {
 			unbooked++
 		}
 		summaries = append(summaries, closure.DaySummary{
-			Date:            d.Date,
-			Booked:          d.Booked,
-			BookingRevision: d.BookingRevision,
-			CurrentRevision: d.CurrentRevision,
-			TrackedMinutes:  d.WorkedMinutes,
+			Date:           d.Date,
+			Booked:         d.Booked,
+			TrackedMinutes: d.WorkedMinutes,
 		})
 	}
 

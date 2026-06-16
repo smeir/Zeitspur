@@ -76,6 +76,10 @@ func (e *Engine) Run(ctx context.Context) error {
 	for {
 		select {
 		case <-ctx.Done():
+			if e.lastState == ActivityActive {
+				_ = e.insertEventAt(context.Background(), EventSuspend, e.lastActiveAt, nil)
+				e.reconcileCurrentDay(context.Background(), e.lastActiveAt)
+			}
 			return nil
 		case <-ticker.C:
 			if err := e.Process(ctx); err != nil {
@@ -105,6 +109,16 @@ func (e *Engine) tick(ctx context.Context) error {
 
 	switch state {
 	case ActivityActive:
+		if e.lastState == ActivityActive && !e.lastActiveAt.IsZero() {
+			gap := now.Sub(e.lastActiveAt)
+			if gap > e.idleThreshold+2*e.pollInterval {
+				if err := e.insertEventAt(ctx, EventSuspend, e.lastActiveAt, nil); err != nil {
+					return err
+				}
+				e.lastState = ActivitySuspended
+			}
+		}
+
 		e.lastActiveAt = now
 		if e.lastState != ActivityActive {
 			eventType := EventActive

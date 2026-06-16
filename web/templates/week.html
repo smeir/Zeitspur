@@ -4,19 +4,18 @@
   <p>{{ T "TotalTracked" }}: {{ formatMinutes .TotalMinutes }} &middot; {{ T "BookedDays" }}: {{ .BookedDays }} &middot; {{ T "UnbookedDays" }}: {{ .UnbookedDays }}</p>
   <table>
     <thead>
-      <tr><th>{{ T "Day" }}</th><th>{{ T "Worked" }}</th><th>{{ T "Pause" }}</th><th>{{ T "Status" }}</th><th>{{ T "Blocks" }}</th><th>{{ T "Changed" }}</th></tr>
-    </thead>
-    <tbody>
-    {{ range .Days }}
+      <tr><th>{{ T "Day" }}</th><th>{{ T "Worked" }}</th><th>{{ T "Pause" }}</th><th>{{ T "Status" }}</th><th>{{ T "Blocks" }}</th></tr>
+      </thead>
+      <tbody>
+      {{ range .Days }}
       <tr>
-        <td><a href="/day/{{ .Date }}">{{ dateShort .DateObj }}</a></td>
-        <td>{{ formatMinutes .WorkedMinutes }}</td>
-        <td>{{ formatMinutes .PauseMinutes }}</td>
-        <td class="{{ if .Booked }}booked{{ else }}unbooked{{ end }}">{{ bookedLabel .Booked }}</td>
-        <td>{{ .BlockCount }}</td>
-        <td>{{ yesNo .ChangedAfterBooking }}</td>
+       <td><a href="/day/{{ .Date }}">{{ dateShort .DateObj }}</a></td>
+       <td>{{ formatMinutes .WorkedMinutes }}</td>
+       <td>{{ formatMinutes .PauseMinutes }}</td>
+       <td class="{{ if .Booked }}booked{{ else }}unbooked{{ end }}">{{ bookedLabel .Booked }}</td>
+       <td>{{ .BlockCount }}</td>
       </tr>
-    {{ end }}
+      {{ end }}
     </tbody>
   </table>
 </div>
