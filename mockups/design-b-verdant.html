@@ -1,0 +1,408 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Zeitspur — Design B «Verdant»</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #f1f5f4;
+    --bg-grain: #eef2f1;
+    --surface: #ffffff;
+    --surface-2: #f6f9f8;
+    --fg: #0f1f1c;
+    --fg-soft: #3d504c;
+    --muted: #7c8c88;
+    --border: #e2e8e6;
+    --border-strong: #cdd8d4;
+    --accent: #0d9488;
+    --accent-strong: #0f766e;
+    --accent-soft: #ccfbf1;
+    --accent-soft-2: #d9f5ee;
+    --success: #16a34a;
+    --success-soft: #dcfce7;
+    --danger: #dc2626;
+    --danger-soft: #fee2e2;
+    --warning: #ca8a04;
+    --warning-soft: #fef9c3;
+    --shadow-sm: 0 1px 2px rgba(15,31,28,0.05);
+    --shadow: 0 6px 20px rgba(15,31,28,0.07), 0 1px 2px rgba(15,31,28,0.04);
+    --radius: 14px;
+    --radius-sm: 9px;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    font-family: 'Inter', system-ui, -apple-system, sans-serif;
+    background: var(--bg);
+    color: var(--fg);
+    line-height: 1.55;
+    -webkit-font-smoothing: antialiased;
+    font-feature-settings: "cv02","cv11";
+  }
+
+  /* ---------- Top nav ---------- */
+  .topbar {
+    background: var(--surface);
+    border-bottom: 1px solid var(--border);
+    position: sticky; top: 0; z-index: 10;
+    box-shadow: var(--shadow-sm);
+  }
+  .topbar-inner { max-width: 1200px; margin: 0 auto; padding: 0 28px; display: flex; align-items: center; gap: 28px; height: 64px; }
+  .brand { display: flex; align-items: center; gap: 11px; }
+  .brand-mark { width: 34px; height: 34px; border-radius: 9px; background: linear-gradient(135deg, #14b8a6, #0d9488);
+    display: grid; place-items: center; box-shadow: 0 4px 12px rgba(13,148,136,0.35); }
+  .brand-mark svg { width: 20px; height: 20px; color: #fff; }
+  .brand-name { font-weight: 800; font-size: 1.05rem; letter-spacing: -0.02em; }
+  .brand-name b { color: var(--accent); }
+
+  .nav { display: flex; gap: 4px; margin-left: 8px; }
+  .nav a {
+    padding: 8px 14px; border-radius: 8px; text-decoration: none; font-size: 0.9rem; font-weight: 600;
+    color: var(--fg-soft); transition: all .15s; display: inline-flex; align-items: center; gap: 7px;
+  }
+  .nav a svg { width: 16px; height: 16px; }
+  .nav a:hover { background: var(--surface-2); color: var(--fg); }
+  .nav a.active { background: var(--accent-soft); color: var(--accent-strong); }
+
+  .topbar-right { margin-left: auto; display: flex; align-items: center; gap: 12px; }
+  .live { display: inline-flex; align-items: center; gap: 8px; font-size: 0.82rem; font-weight: 600; color: var(--fg-soft);
+    background: var(--surface-2); border: 1px solid var(--border); padding: 6px 12px; border-radius: 999px; }
+  .live .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--success); animation: pulse 1.8s infinite; }
+  @keyframes pulse { 0%,100%{opacity:1}50%{opacity:.35} }
+  .top-btn { width: 36px; height: 36px; border-radius: 9px; border: 1px solid var(--border); background: var(--surface);
+    display: grid; place-items: center; cursor: pointer; color: var(--fg-soft); }
+  .top-btn svg { width: 18px; height: 18px; }
+  .top-btn:hover { background: var(--surface-2); }
+
+  /* ---------- Layout ---------- */
+  .wrap { max-width: 1200px; margin: 0 auto; padding: 28px; display: grid; grid-template-columns: 1fr 340px; gap: 22px; }
+  .col-main { min-width: 0; }
+  .col-side { display: flex; flex-direction: column; gap: 18px; }
+
+  /* ---------- Hero ---------- */
+  .hero {
+    background: linear-gradient(135deg, #0d9488 0%, #0f766e 60%, #115e59 100%);
+    border-radius: 20px; padding: 28px 30px; color: #fff; position: relative; overflow: hidden;
+    box-shadow: 0 12px 30px rgba(13,148,136,0.25);
+  }
+  .hero::before { content: ""; position: absolute; right: -40px; top: -40px; width: 220px; height: 220px;
+    background: radial-gradient(circle, rgba(255,255,255,0.18), transparent 60%); border-radius: 50%; }
+  .hero-row { display: flex; justify-content: space-between; align-items: flex-start; position: relative; }
+  .hero h1 { font-size: 1.55rem; font-weight: 800; letter-spacing: -0.02em; }
+  .hero .date { font-size: 0.9rem; opacity: 0.85; margin-top: 3px; }
+  .hero-status { display: inline-flex; align-items: center; gap: 8px; background: rgba(255,255,255,0.18);
+    backdrop-filter: blur(4px); padding: 7px 14px; border-radius: 999px; font-weight: 600; font-size: 0.85rem; }
+  .hero-status .dot { width: 8px; height: 8px; border-radius: 50%; background: #6ee7b7; box-shadow: 0 0 0 4px rgba(110,231,183,0.3); }
+
+  .hero-stats { display: grid; grid-template-columns: repeat(4,1fr); gap: 0; margin-top: 24px; position: relative; }
+  .hs { padding: 0 18px; border-left: 1px solid rgba(255,255,255,0.18); }
+  .hs:first-child { padding-left: 0; border-left: none; }
+  .hs-label { font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.06em; opacity: 0.8; font-weight: 600; }
+  .hs-value { font-size: 1.65rem; font-weight: 800; letter-spacing: -0.02em; margin-top: 4px; font-variant-numeric: tabular-nums; }
+  .hs-value small { font-size: 0.85rem; font-weight: 600; opacity: 0.8; }
+  .hs-sub { font-size: 0.74rem; opacity: 0.75; margin-top: 3px; }
+
+  /* progress ring on hero */
+  .hero-ring { position: relative; }
+  .ring-track { width: 64px; height: 64px; }
+
+  /* ---------- Card ---------- */
+  .card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); box-shadow: var(--shadow-sm); overflow: hidden; margin-bottom: 18px; }
+  .card-pad { padding: 20px 22px; }
+  .card-head { display: flex; justify-content: space-between; align-items: center; padding: 18px 22px; border-bottom: 1px solid var(--border); }
+  .card-head h2 { font-size: 1rem; font-weight: 700; letter-spacing: -0.01em; display: flex; align-items: center; gap: 9px; }
+  .card-head h2 .ico { width: 18px; height: 18px; color: var(--accent); display: inline-flex; }
+  .card-head .sub { font-size: 0.8rem; color: var(--muted); }
+
+  /* ---------- Timeline ---------- */
+  .tl-axis { display: flex; justify-content: space-between; font-size: 0.68rem; color: var(--muted); margin-bottom: 7px; font-variant-numeric: tabular-nums; padding: 0 2px; }
+  .tl-grid { height: 52px; background: var(--surface-2); border-radius: var(--radius-sm); position: relative; overflow: hidden; border: 1px solid var(--border);
+    background-image: repeating-linear-gradient(90deg, transparent, transparent calc(25% - 1px), var(--border) calc(25% - 1px), var(--border) 25%); }
+  .tl-block { position: absolute; top: 5px; bottom: 5px; border-radius: 6px; display: flex; align-items: center; justify-content: center;
+    color: #fff; font-size: 0.7rem; font-weight: 700; font-variant-numeric: tabular-nums; overflow: hidden; white-space: nowrap; padding: 0 5px; }
+  .tl-block.auto { background: linear-gradient(180deg,#2dd4bf,#0d9488); }
+  .tl-block.manual { background: linear-gradient(180deg,#fbbf24,#d97706); }
+  .tl-block.run { background: linear-gradient(180deg,#34d399,#16a34a); }
+  .tl-now { position: absolute; top: -3px; bottom: -3px; width: 2px; background: var(--danger); border-radius: 2px; }
+  .tl-now::after { content:""; position:absolute; top:-3px; left:-3px; width:8px; height:8px; border-radius:50%; background:var(--danger); }
+  .tl-legend { display:flex; gap:16px; margin-top:11px; font-size:0.76rem; color:var(--muted); }
+  .tl-legend span { display:inline-flex; align-items:center; gap:6px; }
+  .tl-legend i { width:10px; height:10px; border-radius:3px; display:inline-block; }
+  .i-a{background:#0d9488}.i-m{background:#d97706}.i-r{background:#16a34a}.i-n{background:var(--danger);width:3px;border-radius:2px;height:11px}
+
+  /* ---------- Table ---------- */
+  table { width: 100%; border-collapse: collapse; }
+  thead th { text-align: left; font-size: 0.7rem; text-transform: uppercase; letter-spacing: 0.06em; color: var(--muted);
+    font-weight: 700; padding: 0 14px 11px; background: var(--surface-2); }
+  thead th:first-child { padding-left: 22px; }
+  thead th:last-child { padding-right: 22px; text-align: right; }
+  tbody td { padding: 13px 14px; border-bottom: 1px solid var(--border); font-size: 0.88rem; vertical-align: middle; }
+  tbody td:first-child { padding-left: 22px; }
+  tbody td:last-child { padding-right: 22px; text-align: right; }
+  tbody tr:last-child td { border-bottom: none; }
+  tbody tr:hover { background: var(--surface-2); }
+  .time { font-variant-numeric: tabular-nums; font-weight: 700; color: var(--fg); }
+  .time .sep { color: var(--muted); margin: 0 2px; font-weight: 500; }
+  .time.end-now { color: var(--success); }
+  .src { font-size: 0.76rem; padding: 3px 9px; border-radius: 6px; font-weight: 700; }
+  .src-auto { background: var(--accent-soft); color: var(--accent-strong); }
+  .src-manual { background: var(--warning-soft); color: #a16207; }
+  .row-ignored td { color: var(--muted); }
+  .row-ignored .time { text-decoration: line-through; }
+  .tag-ig { font-size: 0.68rem; color: var(--muted); margin-left: 6px; font-weight: 600; }
+
+  /* ---------- Buttons ---------- */
+  .btn { display: inline-flex; align-items: center; gap: 7px; padding: 9px 15px; border-radius: 9px; border: 1px solid transparent;
+    font: inherit; font-size: 0.86rem; font-weight: 600; cursor: pointer; text-decoration: none; transition: all .15s; }
+  .btn svg { width: 16px; height: 16px; }
+  .btn-primary { background: var(--accent); color: #fff; box-shadow: 0 3px 10px rgba(13,148,136,0.3); }
+  .btn-primary:hover { background: var(--accent-strong); }
+  .btn-ghost { background: var(--surface); border-color: var(--border-strong); color: var(--fg-soft); }
+  .btn-ghost:hover { background: var(--surface-2); color: var(--fg); border-color: var(--accent); }
+  .btn-sm { padding: 6px 11px; font-size: 0.78rem; border-radius: 7px; }
+  .btn-line { background: transparent; border: 1px dashed var(--border-strong); color: var(--muted); width: 100%; justify-content: center; padding: 11px; }
+  .btn-line:hover { color: var(--accent); border-color: var(--accent); border-style: solid; }
+  .row-actions { display: inline-flex; gap: 6px; }
+  .icon-btn { width: 30px; height: 30px; border-radius: 7px; border: 1px solid var(--border); background: var(--surface);
+    display: grid; place-items: center; cursor: pointer; color: var(--fg-soft); }
+  .icon-btn:hover { background: var(--surface-2); color: var(--fg); }
+  .icon-btn svg { width: 15px; height: 15px; }
+  .icon-btn.danger:hover { background: var(--danger-soft); color: var(--danger); border-color: var(--danger-soft); }
+
+  /* ---------- Status / badges ---------- */
+  .pill { display:inline-flex; align-items:center; gap:7px; padding:4px 11px; border-radius:999px; font-size:0.78rem; font-weight:700; }
+  .pill .dot { width:7px; height:7px; border-radius:50%; }
+  .pill-active{ background:var(--success-soft); color:#15803d; } .pill-active .dot{ background:var(--success); }
+  .booked { color: var(--success); font-weight: 700; }
+  .unbooked { color: var(--danger); font-weight: 700; }
+
+  /* ---------- Side: week chart ---------- */
+  .chart { display: flex; align-items: flex-end; justify-content: space-between; gap: 8px; height: 150px; padding: 6px 2px 0; }
+  .ch-bar-wrap { flex: 1; display: flex; flex-direction: column; align-items: center; gap: 7px; cursor: pointer; }
+  .ch-bar { width: 100%; max-width: 26px; border-radius: 6px 6px 3px 3px; background: linear-gradient(180deg,#2dd4bf,#0d9488);
+    position: relative; transition: filter .15s; min-height: 4px; }
+  .ch-bar-wrap:hover .ch-bar { filter: brightness(1.08); }
+  .ch-bar.booked { background: linear-gradient(180deg,#34d399,#16a34a); }
+  .ch-bar.empty { background: var(--surface-2); border: 1px dashed var(--border-strong); }
+  .ch-bar.today { box-shadow: 0 0 0 2px var(--surface), 0 0 0 4px var(--accent); }
+  .ch-val { font-size: 0.7rem; font-weight: 700; color: var(--fg); font-variant-numeric: tabular-nums; }
+  .ch-dow { font-size: 0.7rem; color: var(--muted); font-weight: 600; }
+  .ch-bar-wrap.today .ch-dow { color: var(--accent-strong); }
+  .ch-foot { display:flex; justify-content:space-between; padding-top:14px; margin-top:6px; border-top:1px solid var(--border);
+    font-size:0.78rem; }
+  .ch-foot div b { display:block; font-size:1.05rem; color:var(--fg); font-weight:800; }
+
+  /* ---------- Side: booking ---------- */
+  .kv { display:flex; justify-content:space-between; align-items:center; padding:9px 0; border-bottom:1px solid var(--border); font-size:0.88rem; }
+  .kv:last-child { border-bottom:none; }
+  .kv .k { color: var(--fg-soft); }
+  .kv .v { font-weight: 700; font-variant-numeric: tabular-nums; }
+  .warn-box { background: var(--warning-soft); border:1px solid #fde68a; border-radius: var(--radius-sm);
+    padding: 11px 13px; font-size: 0.83rem; color: #92400e; display:flex; gap:10px; align-items:flex-start; margin-top:12px; }
+  .warn-box svg { width:17px; height:17px; flex-shrink:0; margin-top:1px; }
+
+  /* ---------- Side: status mini ---------- */
+  .mini-status { display:flex; align-items:center; gap:12px; padding:14px 0 4px; }
+  .ring { position:relative; width:62px; height:62px; flex-shrink:0; }
+  .ring svg { transform: rotate(-90deg); }
+  .ring-label { position:absolute; inset:0; display:grid; place-items:center; font-size:0.78rem; font-weight:800; color:var(--accent-strong); }
+
+  .note-muted { color: var(--muted); }
+
+  @media (max-width: 1000px) {
+    .wrap { grid-template-columns: 1fr; }
+    .hero-stats { grid-template-columns: repeat(2,1fr); gap:14px; }
+    .hero-stats .hs { border-left:none; padding:0; }
+  }
+  @media (max-width: 640px) {
+    .nav { display:none; }
+    .wrap { padding: 16px; }
+  }
+</style>
+</head>
+<body>
+
+<!-- Top nav -->
+<header class="topbar">
+  <div class="topbar-inner">
+    <div class="brand">
+      <div class="brand-mark"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg></div>
+      <div class="brand-name">Zeit<b>spur</b></div>
+    </div>
+    <nav class="nav">
+      <a class="active" href="#"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12l9-9 9 9"/><path d="M5 10v10h14V10"/></svg>Heute</a>
+      <a href="#"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="17" rx="2"/><path d="M3 9h18M8 2v4M16 2v4"/></svg>Woche</a>
+      <a href="#"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="17" rx="2"/><path d="M3 9h18M8 2v4M16 2v4M8 14h3M8 18h6"/></svg>Monat</a>
+      <a href="#"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 11l3 3 8-8"/><path d="M20 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>Buchung</a>
+      <a href="#"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19V5a2 2 0 0 1 2-2h12a2 2 0 0 1 2 2v14l-4-2-4 2-4-2-4 2z"/></svg>Abschlüsse</a>
+      <a href="#"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>Einstellungen</a>
+    </nav>
+    <div class="topbar-right">
+      <span class="live"><span class="dot"></span>System aktiv</span>
+      <button class="top-btn" title="Einstellungen"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg></button>
+    </div>
+  </div>
+</header>
+
+<div class="wrap">
+
+  <!-- Main column -->
+  <div class="col-main">
+
+    <!-- Hero -->
+    <section class="hero">
+      <div class="hero-row">
+        <div>
+          <h1>Heute, 18. Juni</h1>
+          <div class="date">Donnerstag · KW 25</div>
+        </div>
+        <span class="hero-status"><span class="dot"></span>Aktiv · seit 14:15</span>
+      </div>
+      <div class="hero-stats">
+        <div class="hs"><div class="hs-label">Gearbeitet</div><div class="hs-value">6<small>h</small> 24<small>min</small></div><div class="hs-sub">+1h 27min heute Nachmittag</div></div>
+        <div class="hs"><div class="hs-label">Pause</div><div class="hs-value">0<small>h</small> 45<small>min</small></div><div class="hs-sub">automatisch erfasst</div></div>
+        <div class="hs"><div class="hs-label">Blöcke</div><div class="hs-value">3</div><div class="hs-sub">1 läuft, 2 beendet</div></div>
+        <div class="hs"><div class="hs-label">Buchung</div><div class="hs-value" style="font-size:1.15rem"><span style="opacity:.95">nicht gebucht</span></div><div class="hs-sub">Frist: 20.06.</div></div>
+      </div>
+    </section>
+
+    <!-- Timeline -->
+    <div class="card" style="margin-top:18px">
+      <div class="card-head">
+        <h2><span class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12h4l3-9 4 18 3-9h4"/></svg></span>Tagesverlauf</h2>
+        <span class="sub">00:00 – 24:00 Uhr</span>
+      </div>
+      <div class="card-pad" style="padding-top:16px">
+        <div class="tl-axis"><span>00</span><span>06</span><span>12</span><span>18</span><span>24</span></div>
+        <div class="tl-grid">
+          <div class="tl-block auto" style="left:38.3%;width:13.8%">3:18</div>
+          <div class="tl-block manual" style="left:55.2%;width:3.1%">0:45</div>
+          <div class="tl-block run" style="left:59.4%;width:6.4%">1:27</div>
+          <div class="tl-now" style="left:65.8%"></div>
+        </div>
+        <div class="tl-legend">
+          <span><i class="i-a"></i>Automatisch</span>
+          <span><i class="i-m"></i>Manuell</span>
+          <span><i class="i-r"></i>Laufend</span>
+          <span><i class="i-n"></i>Jetzt</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Work blocks -->
+    <div class="card">
+      <div class="card-head">
+        <h2><span class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01"/></svg></span>Arbeitsblöcke</h2>
+        <button class="btn btn-ghost btn-sm"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14M5 12h14"/></svg> Hinzufügen</button>
+      </div>
+      <table>
+        <thead><tr><th>Zeit</th><th>Dauer</th><th>Quelle</th><th>Notiz</th><th>Aktionen</th></tr></thead>
+        <tbody>
+          <tr>
+            <td><span class="time">09<span class="sep">:</span>12</span> – <span class="time">12<span class="sep">:</span>30</span></td>
+            <td><b>3h 18</b></td>
+            <td><span class="src src-auto">Automatisch</span></td>
+            <td class="note-muted">—</td>
+            <td><div class="row-actions"><button class="icon-btn" title="Ignorieren"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12s3-7 9-7 9 7 9 7-3 7-9 7-9-7-9-7z"/><path d="M3 3l18 18"/></svg></button></div></td>
+          </tr>
+          <tr>
+            <td><span class="time">13<span class="sep">:</span>15</span> – <span class="time">14<span class="sep">:</span>00</span></td>
+            <td><b>0h 45</b></td>
+            <td><span class="src src-manual">Manuell</span></td>
+            <td>Kunde: Akme GmbH</td>
+            <td><div class="row-actions"><button class="icon-btn" title="Ignorieren"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12s3-7 9-7 9 7 9 7-3 7-9 7-9-7-9-7z"/><path d="M3 3l18 18"/></svg></button><button class="icon-btn danger" title="Löschen"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2m3 0v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"/></svg></button></div></td>
+          </tr>
+          <tr>
+            <td><span class="time">14<span class="sep">:</span>15</span> – <span class="time end-now">läuft</span></td>
+            <td><b style="color:var(--success)">1h 27</b></td>
+            <td><span class="src src-auto">Automatisch</span></td>
+            <td class="note-muted">—</td>
+            <td><div class="row-actions"><button class="icon-btn" title="Ignorieren"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12s3-7 9-7 9 7 9 7-3 7-9 7-9-7-9-7z"/><path d="M3 3l18 18"/></svg></button></div></td>
+          </tr>
+          <tr class="row-ignored">
+            <td><span class="time">08<span class="sep">:</span>02</span> – <span class="time">08<span class="sep">:</span>14</span></td>
+            <td><b>0h 12</b></td>
+            <td><span class="src src-auto">Automatisch<span class="tag-ig">ignoriert</span></span></td>
+            <td>Kurzmeldung</td>
+            <td><div class="row-actions"><button class="icon-btn" title="Ignorieren zurücksetzen"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12s3-7 9-7 9 7 9 7-3 7-9 7-9-7-9-7z"/><circle cx="12" cy="12" r="3"/></svg></button></div></td>
+          </tr>
+        </tbody>
+      </table>
+      <div class="card-pad" style="padding:12px 22px 16px">
+        <button class="btn btn-line"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14M5 12h14"/></svg> Manuellen Block hinzufügen</button>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- Side column -->
+  <div class="col-side">
+
+    <!-- Status / progress -->
+    <div class="card">
+      <div class="card-head"><h2><span class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg></span>Tagesfortschritt</h2></div>
+      <div class="card-pad">
+        <div class="mini-status">
+          <div class="ring">
+            <svg width="62" height="62" viewBox="0 0 62 62">
+              <circle cx="31" cy="31" r="26" fill="none" stroke="#e2e8e6" stroke-width="7"/>
+              <circle cx="31" cy="31" r="26" fill="none" stroke="#0d9488" stroke-width="7" stroke-linecap="round"
+                stroke-dasharray="163.4" stroke-dashoffset="32.7"/>
+            </svg>
+            <div class="ring-label">80%</div>
+          </div>
+          <div>
+            <div style="font-size:0.78rem;color:var(--muted);font-weight:600">Ziel 8h · erreicht</div>
+            <div style="font-size:1.25rem;font-weight:800;letter-spacing:-0.02em">6h 24min</div>
+            <div style="font-size:0.8rem;color:var(--fg-soft)">noch 1h 36min bis Ziel</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Week chart -->
+    <div class="card">
+      <div class="card-head"><h2><span class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3v18h18"/><path d="M7 14l4-4 3 3 5-6"/></svg></span>Diese Woche</h2><a class="btn btn-ghost btn-sm" href="#">→</a></div>
+      <div class="card-pad">
+        <div class="chart">
+          <div class="ch-bar-wrap"><div class="ch-val">7:02</div><div class="ch-bar booked" style="height:88%"></div><div class="ch-dow">Mo 15</div></div>
+          <div class="ch-bar-wrap"><div class="ch-val">7:24</div><div class="ch-bar booked" style="height:92%"></div><div class="ch-dow">Di 16</div></div>
+          <div class="ch-bar-wrap"><div class="ch-val">6:19</div><div class="ch-bar booked" style="height:79%"></div><div class="ch-dow">Mi 17</div></div>
+          <div class="ch-bar-wrap today"><div class="ch-val">6:24</div><div class="ch-bar today" style="height:80%"></div><div class="ch-dow">Do 18</div></div>
+          <div class="ch-bar-wrap"><div class="ch-val">—</div><div class="ch-bar empty" style="height:6%"></div><div class="ch-dow">Fr 19</div></div>
+          <div class="ch-bar-wrap" style="opacity:.5"><div class="ch-val">—</div><div class="ch-bar empty" style="height:6%"></div><div class="ch-dow">Sa 20</div></div>
+          <div class="ch-bar-wrap" style="opacity:.5"><div class="ch-val">—</div><div class="ch-bar empty" style="height:6%"></div><div class="ch-dow">So 21</div></div>
+        </div>
+        <div class="ch-foot">
+          <div>Gesamt<b>27h 09</b></div>
+          <div>Gebucht<b style="color:var(--success)">3</b></div>
+          <div>Offen<b style="color:var(--danger)">2</b></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Booking -->
+    <div class="card">
+      <div class="card-head"><h2><span class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 11l3 3 8-8"/><path d="M20 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg></span>Buchungsperiode</h2></div>
+      <div class="card-pad">
+        <div class="kv"><span class="k">Periode</span><span class="v">15. – 20.06.</span></div>
+        <div class="kv"><span class="k">Buchungstag</span><span class="v">20.06.2026</span></div>
+        <div class="kv"><span class="k">Verbleibend</span><span class="v" style="color:var(--warning)">2 Tage</span></div>
+        <div class="kv"><span class="k">Status</span><span class="v unbooked">offen</span></div>
+        <div class="warn-box">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><path d="M12 9v4M12 17h.01"/></svg>
+          <span>2 Tage sind noch nicht gebucht. Buchungstag rückt näher.</span>
+        </div>
+        <button class="btn btn-primary" style="width:100%;justify-content:center;margin-top:14px"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 11l3 3 8-8"/><path d="M20 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg> Periode abschließen</button>
+      </div>
+    </div>
+
+  </div>
+</div>
+</body>
+</html>

@@ -1,37 +1,66 @@
 {{ define "content" }}
-{{ template "today_status" . }}
+<div class="wrap">
+  <div class="col-main">
+    {{ template "today_status" . }}
 
-<div class="card">
-  <h3>{{ T "WorkBlocks" }}</h3>
+    <div class="card timeline-card">
+      <div class="card-head">
+        <h2><span class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12h4l3-9 4 18 3-9h4"/></svg></span>{{ T "DailyTimeline" }}</h2>
+      </div>
+      <div class="card-pad">
+        <div class="tl-axis"><span>00</span><span>06</span><span>12</span><span>18</span><span>24</span></div>
+        <div class="tl-grid">
+          {{ range .TimelineBlocks }}
+            <div class="tl-block {{ .Class }}" style="left: {{ .Left }}; width: {{ .Width }};">{{ .Label }}</div>
+          {{ end }}
+          {{ if .NowPercent }}<div class="tl-now" style="left: {{ .NowPercent }};"></div>{{ end }}
+        </div>
+        <div class="tl-legend">
+          <span><i class="i-a"></i>{{ T "SourceDetected" }}</span>
+          <span><i class="i-m"></i>{{ T "SourceManual" }}</span>
+          <span><i class="i-r"></i>{{ T "Running" }}</span>
+          <span><i class="i-n"></i>{{ T "Now" }}</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-head">
+        <h2><span class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01"/></svg></span>{{ T "WorkBlocks" }}</h2>
+        <button type="button" class="btn btn-ghost btn-sm" onclick="document.getElementById('manual-block-dialog').showModal()">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14M5 12h14"/></svg>{{ T "Add" }}
+        </button>
+      </div>
   {{ if .Blocks }}
   <table>
     <thead>
-      <tr><th>{{ T "Start" }}</th><th>{{ T "End" }}</th><th>{{ T "Source" }}</th><th>{{ T "Note" }}</th><th>{{ T "Actions" }}</th></tr>
+      <tr><th>{{ T "Time" }}</th><th>{{ T "Duration" }}</th><th>{{ T "Source" }}</th><th>{{ T "Note" }}</th><th>{{ T "Actions" }}</th></tr>
     </thead>
     <tbody>
     {{ range .Blocks }}
-      <tr class="{{ if eq .Status "ignored" }}ignored{{ end }}">
-        <td>{{ .Start.Format "15:04" }}</td>
-        <td>{{ .End.Format "15:04" }}</td>
+      <tr class="{{ if eq .Status "ignored" }}row-ignored{{ end }}">
+        <td><span class="time">{{ .Start.Format "15:04" }}</span> <span class="time-sep">-</span> <span class="time">{{ .End.Format "15:04" }}</span></td>
+        <td><strong>{{ formatMinutes .DurationMinutes }}</strong></td>
         <td>
-          {{ sourceLabel .Source }}
-          {{ if eq .Status "ignored" }}<span class="ignored-badge">({{ T "Ignored" }})</span>{{ end }}
+          <span class="src {{ if eq .Source "manual" }}src-manual{{ else }}src-auto{{ end }}">{{ sourceLabel .Source }}</span>
+          {{ if eq .Status "ignored" }}<span class="tag-ig">{{ T "Ignored" }}</span>{{ end }}
         </td>
-        <td>{{ .Note }}</td>
+        <td>{{ if .Note }}{{ .Note }}{{ else }}<span class="note-muted">-</span>{{ end }}</td>
         <td>
+          <div class="row-actions">
           {{ if eq .Status "ignored" }}
             <form class="inline" action="/day/{{ .Date }}/block/{{ .ID }}/unignore" method="post">
               <input type="hidden" name="csrf_token" value="{{ $.CSRFToken }}">
               <input type="hidden" name="started_at" value="{{ .StartStr }}">
               <input type="hidden" name="ended_at" value="{{ .EndStr }}">
-              <button type="submit" class="secondary">{{ T "Unignore" }}</button>
+              <button type="submit" class="icon-btn" title="{{ T "Unignore" }}" aria-label="{{ T "Unignore" }}"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12s3-7 9-7 9 7 9 7-3 7-9 7-9-7-9-7z"/><circle cx="12" cy="12" r="3"/></svg></button>
             </form>
           {{ else }}
             <form class="inline" action="/day/{{ .Date }}/block/{{ .ID }}/ignore" method="post">
               <input type="hidden" name="csrf_token" value="{{ $.CSRFToken }}">
               <input type="hidden" name="started_at" value="{{ .StartStr }}">
               <input type="hidden" name="ended_at" value="{{ .EndStr }}">
-              <button type="submit" class="secondary">{{ T "Ignore" }}</button>
+              <button type="submit" class="icon-btn" title="{{ T "Ignore" }}" aria-label="{{ T "Ignore" }}"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12s3-7 9-7 9 7 9 7-3 7-9 7-9-7-9-7z"/><path d="M3 3l18 18"/></svg></button>
             </form>
           {{ end }}
           {{ if eq .Source "manual" }}
@@ -39,20 +68,23 @@
               <input type="hidden" name="csrf_token" value="{{ $.CSRFToken }}">
               <input type="hidden" name="started_at" value="{{ .StartStr }}">
               <input type="hidden" name="ended_at" value="{{ .EndStr }}">
-              <button type="submit" class="danger">{{ T "Delete" }}</button>
+              <button type="submit" class="icon-btn danger" title="{{ T "Delete" }}" aria-label="{{ T "Delete" }}"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2m3 0v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"/></svg></button>
             </form>
           {{ end }}
+          </div>
         </td>
       </tr>
     {{ end }}
     </tbody>
   </table>
   {{ else }}
-    <p>{{ T "NoWorkBlocks" }}</p>
+    <div class="empty-state">{{ T "NoWorkBlocks" }}</div>
   {{ end }}
-  <button type="button" class="secondary" onclick="document.getElementById('manual-block-dialog').showModal()">
-    {{ T "AddManualBlock" }}
-  </button>
+  <div class="card-pad compact-pad">
+    <button type="button" class="btn btn-line" onclick="document.getElementById('manual-block-dialog').showModal()">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14M5 12h14"/></svg>{{ T "AddManualBlock" }}
+    </button>
+  </div>
 
   <dialog id="manual-block-dialog">
     <h4>{{ T "AddManualBlock" }}</h4>
@@ -253,6 +285,76 @@
       </div>
     </form>
   </dialog>
+    </div>
+  </div>
+
+  <aside class="col-side">
+    <div class="card">
+      <div class="card-head">
+        <h2><span class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg></span>{{ T "DailyProgress" }}</h2>
+      </div>
+      <div class="card-pad">
+        <div class="mini-status">
+          <div class="ring" style="--progress: {{ .DayProgressPercent }};">
+            <svg width="62" height="62" viewBox="0 0 62 62" aria-hidden="true">
+              <circle cx="31" cy="31" r="26" fill="none" stroke="#e2e8e6" stroke-width="7"/>
+              <circle class="ring-progress" cx="31" cy="31" r="26" fill="none" stroke="#0d9488" stroke-width="7" stroke-linecap="round"/>
+            </svg>
+            <div class="ring-label">{{ .DayProgressPercent }}%</div>
+          </div>
+          <div>
+            <div class="side-kicker">{{ T "TargetEightHours" }}</div>
+            <div class="side-value">{{ formatMinutes .WorkedMinutes }}</div>
+            <div class="side-copy">{{ Tf "RemainingUntilTarget" (dict "Duration" (formatMinutes .DayRemainingMinutes)) }}</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-head">
+        <h2><span class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3v18h18"/><path d="M7 14l4-4 3 3 5-6"/></svg></span>{{ T "ThisWeek" }}</h2>
+        <a class="btn btn-ghost btn-sm" href="/week" aria-label="{{ T "NavWeek" }}">→</a>
+      </div>
+      <div class="card-pad">
+        <div class="chart">
+          {{ range .WeekChartDays }}
+            <a class="ch-bar-wrap {{ if .IsToday }}today{{ end }}" href="/day/{{ .Date }}" style="{{ if .IsFuture }}opacity: .5;{{ end }}">
+              <div class="ch-val">{{ if gt .WorkedMinutes 0 }}{{ formatMinutes .WorkedMinutes }}{{ else }}-{{ end }}</div>
+              <div class="ch-bar {{ if .Booked }}booked{{ end }} {{ if .IsToday }}today{{ end }} {{ if eq .WorkedMinutes 0 }}empty{{ end }}" style="height: {{ .HeightPercent }}%;"></div>
+              <div class="ch-dow">{{ .Label }}</div>
+            </a>
+          {{ end }}
+        </div>
+        <div class="ch-foot">
+          <div>{{ T "TotalTracked" }}<b>{{ formatMinutes .WeekTotalMinutes }}</b></div>
+          <div>{{ T "Booked" }}<b class="good">{{ .WeekBookedDays }}</b></div>
+          <div>{{ T "Unbooked" }}<b class="bad">{{ .WeekUnbookedDays }}</b></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-head">
+        <h2><span class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 11l3 3 8-8"/><path d="M20 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg></span>{{ T "BookingPeriod" }}</h2>
+      </div>
+      <div class="card-pad">
+        {{ if .BookingAside.Configured }}
+          <div class="kv"><span class="k">{{ T "Period" }}</span><span class="v">{{ dateShort .BookingAside.PeriodStart }} - {{ dateShort .BookingAside.PeriodEnd }}</span></div>
+          <div class="kv"><span class="k">{{ T "BookingDay" }}</span><span class="v">{{ dateShort .BookingAside.BookingDay }}</span></div>
+          <div class="kv"><span class="k">{{ T "Remaining" }}</span><span class="v warn">{{ Tf "DaysRemainingShort" (dict "Days" .BookingAside.DaysRemaining) }}</span></div>
+          <div class="kv"><span class="k">{{ T "Status" }}</span><span class="v {{ if .Booked }}booked{{ else }}unbooked{{ end }}">{{ bookedLabel .Booked }}</span></div>
+          {{ if gt .BookingAside.OpenDays 0 }}
+            <div class="warn-box"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><path d="M12 9v4M12 17h.01"/></svg><span>{{ Tf "OpenBookingDaysWarning" (dict "Count" .BookingAside.OpenDays) }}</span></div>
+          {{ end }}
+          <a class="btn btn-primary full-width" href="/booking">{{ T "OpenBookingPeriod" }}</a>
+        {{ else }}
+          <div class="empty-state left">{{ T "NoBookingDaySet" }}</div>
+          <a class="btn btn-primary full-width" href="/booking">{{ T "SetBookingDay" }}</a>
+        {{ end }}
+      </div>
+    </div>
+  </aside>
 </div>
 
 {{ end }}

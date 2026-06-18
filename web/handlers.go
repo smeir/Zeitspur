@@ -17,6 +17,7 @@ import (
 	"github.com/smeir/zeitspur/internal/config"
 	"github.com/smeir/zeitspur/internal/i18n"
 	"github.com/smeir/zeitspur/internal/timeline"
+	"github.com/smeir/zeitspur/internal/timeutil"
 )
 
 func (s *Server) handleToday(w http.ResponseWriter, r *http.Request) {
@@ -26,7 +27,7 @@ func (s *Server) handleToday(w http.ResponseWriter, r *http.Request) {
 
 func (s *Server) handleTodayStatus(w http.ResponseWriter, r *http.Request) {
 	date := s.clk.Now().In(s.location()).Format("2006-01-02")
-	d := s.dayData(r, date)
+	d := s.dayData(r, date, false)
 	s.renderBlock(w, r, "today", "today_status", d, http.StatusOK)
 }
 
@@ -37,19 +38,22 @@ func (s *Server) handleDay(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "invalid date", http.StatusBadRequest)
 		return
 	}
-	d := s.dayData(r, date)
+	d := s.dayData(r, date, true)
 	d["DateObj"] = dateObj
 	d["Title"] = "PageDay"
 	d["Nav"] = "today"
 	s.renderLayout(w, r, "today", d, http.StatusOK)
 }
 
-func (s *Server) dayData(r *http.Request, date string) map[string]any {
+func (s *Server) dayData(r *http.Request, date string, full bool) map[string]any {
 	ctx := r.Context()
 	tsvc := timeline.NewService(s.db)
 	sum, err := tsvc.Day(ctx, date)
 	if err != nil {
 		slog.Error("timeline day failed", "error", err)
+	}
+	if sum == nil {
+		sum = &timeline.DaySummary{}
 	}
 
 	br := booking.NewRepository(s.db)
@@ -62,25 +66,29 @@ func (s *Server) dayData(r *http.Request, date string) map[string]any {
 
 	blocks, _ := s.blocksForDay(ctx, date)
 
+	// The current running block and the "now" marker only make sense for today;
+	// for past or future days they would otherwise leak the current activity
+	// onto a foreign day's timeline.
+	today := s.clk.Now().In(s.location()).Format("2006-01-02")
 	var running *time.Time
 	var runningMinutes int
-	if state == activity.ActivityActive {
+	if date == today && state == activity.ActivityActive {
 		running, runningMinutes = s.currentBlock(ctx, date)
 	}
 
 	dateObj, _ := time.Parse("2006-01-02", date)
 
-	return map[string]any{
-		"Date":              date,
-		"DateObj":           dateObj,
-		"Status":            string(state),
-		"CurrentBlockStart": running,
-		"RunningMinutes":    runningMinutes,
-		"WorkedMinutes":     sum.WorkedMinutes,
-		"PauseMinutes":      sum.PauseMinutes,
-		"Booked":            status.Booked,
-		"Blocks":            blocks,
+	data := map[string]any{
+		"Date":           date,
+		"DateObj":        dateObj,
+		"WorkedMinutes":  sum.WorkedMinutes,
+		"PauseMinutes":   sum.PauseMinutes,
+		"Booked":         status.Booked,
+		"Blocks":         blocks,
+		"ActivityStatus": string(state),
 	}
+	s.addTodayViewData(ctx, data, date, sum, blocks, running, runningMinutes, status.Booked, full)
+	return data
 }
 
 // currentBlock returns an open running block derived from recent activity events.
@@ -142,15 +150,33 @@ func (s *Server) currentBlock(ctx context.Context, date string) (*time.Time, int
 }
 
 type blockView struct {
-	ID       int
-	Date     string
-	Start    time.Time
-	End      time.Time
-	StartStr string
-	EndStr   string
-	Source   string
-	Status   string
-	Note     string
+	ID              int
+	Date            string
+	Start           time.Time
+	End             time.Time
+	StartStr        string
+	EndStr          string
+	Source          string
+	Status          string
+	Note            string
+	DurationMinutes int
+}
+
+type timelineBlockView struct {
+	Label string
+	Class string
+	Left  string
+	Width string
+}
+
+type weekChartDayView struct {
+	Date          string
+	Label         string
+	WorkedMinutes int
+	Booked        bool
+	IsToday       bool
+	IsFuture      bool
+	HeightPercent int
 }
 
 func (s *Server) blocksForDay(ctx context.Context, date string) ([]blockView, error) {
@@ -177,6 +203,9 @@ func (s *Server) blocksForDay(ctx context.Context, date string) ([]blockView, er
 		b.End, _ = time.Parse(time.RFC3339Nano, endStr)
 		b.StartStr = startStr
 		b.EndStr = endStr
+		if d := b.End.Sub(b.Start); d > 0 {
+			b.DurationMinutes = int(d.Minutes())
+		}
 		if note.Valid {
 			b.Note = note.String
 		}
@@ -267,13 +296,7 @@ func (s *Server) updateBlockStatus(ctx context.Context, date, idStr, started, en
 
 func (s *Server) handleWeek(w http.ResponseWriter, r *http.Request) {
 	now := s.clk.Now().In(s.location())
-	wd := int(now.Weekday())
-	if wd == 0 {
-		wd = 7
-	}
-	start := now.AddDate(0, 0, -(wd - 1))
-	start = time.Date(start.Year(), start.Month(), start.Day(), 0, 0, 0, 0, s.location())
-	end := start.AddDate(0, 0, 6)
+	start, end := weekBounds(now)
 
 	startStr := start.Format("2006-01-02")
 	endStr := end.Format("2006-01-02")
@@ -301,6 +324,239 @@ func (s *Server) handleWeek(w http.ResponseWriter, r *http.Request) {
 		"BookedDays":   booked,
 		"UnbookedDays": unbooked,
 	}, http.StatusOK)
+}
+
+// dailyTargetMinutes is the assumed daily working-time target (8 hours).
+const dailyTargetMinutes = 8 * 60
+
+// addTodayViewData enriches data with the rendered day view. The week chart and
+// booking aside require extra DB queries and are only built when full is set;
+// the htmx status poll (today_status) does not render them.
+func (s *Server) addTodayViewData(ctx context.Context, data map[string]any, date string, sum *timeline.DaySummary, blocks []blockView, running *time.Time, runningMinutes int, booked, full bool) {
+	loc := s.location()
+	now := s.clk.Now().In(loc)
+	dateObj, _ := time.ParseInLocation("2006-01-02", date, loc)
+	if dateObj.IsZero() {
+		dateObj = now
+	}
+
+	isToday := sameDate(dateObj, now)
+
+	activeBlocks := 0
+	runningBlockRendered := false
+	var timelineBlocks []timelineBlockView
+	for _, b := range blocks {
+		if b.Status != "active" {
+			continue
+		}
+		activeBlocks++
+		isRunning := running != nil && sameInstant(b.Start, *running)
+		if isRunning {
+			runningBlockRendered = true
+		}
+		// The timeline view-model is only consumed by the full day page; the
+		// htmx status poll (full=false) just needs the block counts above.
+		if !full {
+			continue
+		}
+		end := b.End.In(loc)
+		duration := b.DurationMinutes
+		class := "auto"
+		if b.Source == "manual" {
+			class = "manual"
+		}
+		if isRunning {
+			end = now
+			duration = runningMinutes
+			class = "run"
+		}
+		timelineBlocks = append(timelineBlocks, timelineBlockView{
+			Label: timeutil.FormatMinutes(duration),
+			Class: class,
+			Left:  percentOfDay(b.Start.In(loc)),
+			Width: widthOfDay(b.Start.In(loc), end),
+		})
+	}
+	extraRunningBlock := running != nil && !runningBlockRendered
+	if full && extraRunningBlock {
+		timelineBlocks = append(timelineBlocks, timelineBlockView{
+			Label: timeutil.FormatMinutes(runningMinutes),
+			Class: "run",
+			Left:  percentOfDay(running.In(loc)),
+			Width: widthOfDay(running.In(loc), now),
+		})
+	}
+
+	openBlocks := 0
+	if running != nil {
+		openBlocks = 1
+	}
+	totalBlocks := activeBlocks
+	if extraRunningBlock {
+		totalBlocks++
+	}
+
+	// NowPercent drives the "now" marker; only render it on today's timeline.
+	nowPercent := ""
+	if isToday {
+		nowPercent = percentOfDay(now)
+	}
+
+	data["IsToday"] = isToday
+	data["TodayHeadline"] = fmt.Sprintf("%s, %s", i18n.WeekdayName(dateObj, s.locale()), i18n.DateShort(dateObj, s.locale()))
+	data["TodaySubline"] = s.catalog.Tf(s.locale(), "ISOWeekShort", map[string]any{"Week": fmt.Sprintf("%02d", isoWeek(dateObj))})
+	data["NowPercent"] = nowPercent
+	data["TimelineBlocks"] = timelineBlocks
+	data["ActiveBlockCount"] = totalBlocks
+	data["OpenBlockCount"] = openBlocks
+	data["DayProgressPercent"] = progressPercent(sum.WorkedMinutes, dailyTargetMinutes)
+	data["DayTargetMinutes"] = dailyTargetMinutes
+	data["DayRemainingMinutes"] = max(0, dailyTargetMinutes-sum.WorkedMinutes)
+
+	if !full {
+		return
+	}
+
+	weekDays, weekTotal, weekBooked, weekUnbooked := s.weekChart(ctx, now)
+	data["WeekChartDays"] = weekDays
+	data["WeekTotalMinutes"] = weekTotal
+	data["WeekBookedDays"] = weekBooked
+	data["WeekUnbookedDays"] = weekUnbooked
+	data["BookingAside"] = s.bookingAside(ctx, dateObj, booked)
+}
+
+func (s *Server) weekChart(ctx context.Context, now time.Time) ([]weekChartDayView, int, int, int) {
+	start, end := weekBounds(now)
+	days, err := timeline.NewService(s.db).Range(ctx, start.Format("2006-01-02"), end.Format("2006-01-02"))
+	byDate := make(map[string]*timeline.DaySummary, len(days))
+	maxMinutes := 1
+	total, booked, unbooked := 0, 0, 0
+	if err == nil {
+		for _, d := range days {
+			byDate[d.Date] = d
+			total += d.WorkedMinutes
+			if d.WorkedMinutes > maxMinutes {
+				maxMinutes = d.WorkedMinutes
+			}
+		}
+	}
+
+	var result []weekChartDayView
+	for i := 0; i < 7; i++ {
+		day := start.AddDate(0, 0, i)
+		date := day.Format("2006-01-02")
+		summary := byDate[date]
+		worked := 0
+		isBooked := false
+		if summary != nil {
+			worked = summary.WorkedMinutes
+			isBooked = summary.Booked
+		}
+		if isBooked {
+			booked++
+		} else if worked > 0 && !day.After(now) {
+			// Only days with tracked activity can be "not booked yet";
+			// empty weekends/holidays must not inflate the warning count.
+			unbooked++
+		}
+		height := 6
+		if worked > 0 {
+			height = max(12, (worked*100)/maxMinutes)
+		}
+		result = append(result, weekChartDayView{
+			Date:          date,
+			Label:         fmt.Sprintf("%s %d", i18n.WeekdayShort(day, s.locale()), day.Day()),
+			WorkedMinutes: worked,
+			Booked:        isBooked,
+			IsToday:       sameDate(day, now),
+			IsFuture:      day.After(now),
+			HeightPercent: min(height, 100),
+		})
+	}
+	return result, total, booked, unbooked
+}
+
+func (s *Server) bookingAside(ctx context.Context, date time.Time, booked bool) map[string]any {
+	br := booking.NewRepository(s.db)
+	bookingDay, err := br.GetBookingDay(ctx)
+	if err != nil || bookingDay == nil {
+		return map[string]any{
+			"Configured": false,
+			"Booked":     booked,
+		}
+	}
+	now := s.clk.Now().In(s.location())
+	periodStart, err := closure.NewRepository(s.db).PeriodStart(ctx, *bookingDay)
+	if err != nil {
+		periodStart = date
+	}
+	days, _ := timeline.NewService(s.db).Range(ctx, periodStart.Format("2006-01-02"), bookingDay.Format("2006-01-02"))
+	openDays := 0
+	for _, d := range days {
+		if !d.Booked {
+			openDays++
+		}
+	}
+	return map[string]any{
+		"Configured":    true,
+		"PeriodStart":   periodStart,
+		"PeriodEnd":     *bookingDay,
+		"BookingDay":    *bookingDay,
+		"DaysRemaining": int(bookingDay.Sub(time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, now.Location())).Hours() / 24),
+		"OpenDays":      openDays,
+		"Booked":        booked,
+	}
+}
+
+func percentOfDay(t time.Time) string {
+	minutes := t.Hour()*60 + t.Minute()
+	return fmt.Sprintf("%.2f%%", float64(minutes)*100/1440)
+}
+
+func widthOfDay(start, end time.Time) string {
+	minutes := int(end.Sub(start).Minutes())
+	if minutes < 1 {
+		minutes = 1
+	}
+	return fmt.Sprintf("%.2f%%", float64(minutes)*100/1440)
+}
+
+func progressPercent(value, target int) int {
+	if target <= 0 {
+		return 0
+	}
+	return min(100, max(0, (value*100)/target))
+}
+
+func isoWeek(t time.Time) int {
+	_, week := t.ISOWeek()
+	return week
+}
+
+// weekBounds returns the Monday and Sunday (both at midnight, in now's
+// location) of the ISO week containing now.
+func weekBounds(now time.Time) (start, end time.Time) {
+	wd := int(now.Weekday())
+	if wd == 0 {
+		wd = 7
+	}
+	start = time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, now.Location()).AddDate(0, 0, -(wd - 1))
+	end = start.AddDate(0, 0, 6)
+	return start, end
+}
+
+func sameDate(a, b time.Time) bool {
+	ay, am, ad := a.Date()
+	by, bm, bd := b.Date()
+	return ay == by && am == bm && ad == bd
+}
+
+func sameInstant(a, b time.Time) bool {
+	delta := a.Sub(b)
+	if delta < 0 {
+		delta = -delta
+	}
+	return delta < time.Second
 }
 
 func (s *Server) handleMonth(w http.ResponseWriter, r *http.Request) {

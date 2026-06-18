@@ -292,6 +292,34 @@ func TestServer_EnglishDayView(t *testing.T) {
 	if strings.Contains(body, "Heute") {
 		t.Errorf("did not expect German 'Heute' in English day view")
 	}
+	if strings.Contains(body, "KW ") {
+		t.Errorf("did not expect German ISO week label in English day view")
+	}
+	if !strings.Contains(body, "Week 24") {
+		t.Errorf("expected English ISO week label, got body:\n%s", body)
+	}
+}
+
+func TestServer_DayViewReflectsInactiveActivityStatus(t *testing.T) {
+	srv, _ := newTestServer(t)
+	srv.provider.(*activity.MockProvider).SetState(activity.ActivityIdle)
+
+	req := httptest.NewRequest(http.MethodGet, "/day/2026-06-13", nil)
+	rr := httptest.NewRecorder()
+	srv.ServeHTTP(rr, req)
+	if rr.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d", rr.Code)
+	}
+	body := rr.Body.String()
+	if !strings.Contains(body, `class="live live-idle"`) {
+		t.Errorf("expected header to render idle status, got body:\n%s", body)
+	}
+	if !strings.Contains(body, `class="hero-status hero-status-idle"`) {
+		t.Errorf("expected today status card to render idle status, got body:\n%s", body)
+	}
+	if strings.Contains(body, "System aktiv") {
+		t.Errorf("did not expect fixed active label in idle day view")
+	}
 }
 
 // TestStatusLabelCoverage guards against the catalog drifting out of sync with

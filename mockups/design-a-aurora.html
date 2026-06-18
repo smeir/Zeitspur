@@ -1,0 +1,427 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Zeitspur — Design A «Aurora»</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #f7f7fb;
+    --bg-soft: #eef0f7;
+    --surface: #ffffff;
+    --surface-2: #fafbff;
+    --fg: #1a1d2e;
+    --fg-soft: #4a4f6a;
+    --muted: #8a8fa8;
+    --border: #e8eaf2;
+    --border-strong: #d9dceb;
+    --accent: #6366f1;
+    --accent-soft: #eef0ff;
+    --accent-strong: #4f46e5;
+    --success: #16a34a;
+    --success-soft: #dcfce7;
+    --danger: #e11d48;
+    --danger-soft: #ffe4e6;
+    --warning: #d97706;
+    --warning-soft: #fef3c7;
+    --info: #0284c7;
+    --info-soft: #e0f2fe;
+    --shadow-sm: 0 1px 2px rgba(20,23,46,0.04), 0 1px 3px rgba(20,23,46,0.04);
+    --shadow: 0 4px 16px rgba(20,23,46,0.06), 0 1px 3px rgba(20,23,46,0.04);
+    --shadow-lg: 0 12px 32px rgba(20,23,46,0.08);
+    --radius: 16px;
+    --radius-sm: 10px;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    font-family: 'Inter', system-ui, -apple-system, sans-serif;
+    background: var(--bg);
+    color: var(--fg);
+    line-height: 1.55;
+    -webkit-font-smoothing: antialiased;
+    font-feature-settings: "cv02","cv03","cv04","cv11";
+  }
+
+  .app { display: grid; grid-template-columns: 248px 1fr; min-height: 100vh; }
+
+  /* ---------- Sidebar ---------- */
+  .sidebar {
+    background: var(--surface);
+    border-right: 1px solid var(--border);
+    padding: 24px 16px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    position: sticky;
+    top: 0;
+    height: 100vh;
+  }
+  .brand { display: flex; align-items: center; gap: 12px; padding: 8px 12px 20px; }
+  .brand-mark {
+    width: 38px; height: 38px; border-radius: 11px;
+    background: linear-gradient(135deg, #6366f1, #8b5cf6);
+    display: grid; place-items: center;
+    box-shadow: 0 6px 16px rgba(99,102,241,0.35);
+  }
+  .brand-mark svg { width: 22px; height: 22px; color: #fff; }
+  .brand-name { font-size: 1.05rem; font-weight: 700; letter-spacing: -0.01em; }
+  .brand-sub { font-size: 0.72rem; color: var(--muted); font-weight: 500; }
+
+  .nav-label {
+    font-size: 0.68rem; text-transform: uppercase; letter-spacing: 0.08em;
+    color: var(--muted); font-weight: 600; padding: 16px 12px 6px;
+  }
+  .nav-item {
+    display: flex; align-items: center; gap: 12px;
+    padding: 10px 12px; border-radius: var(--radius-sm);
+    color: var(--fg-soft); text-decoration: none; font-size: 0.92rem; font-weight: 500;
+    transition: background .15s, color .15s;
+  }
+  .nav-item svg { width: 19px; height: 19px; flex-shrink: 0; }
+  .nav-item:hover { background: var(--bg-soft); color: var(--fg); }
+  .nav-item.active { background: var(--accent-soft); color: var(--accent-strong); font-weight: 600; }
+  .nav-item.active svg { color: var(--accent); }
+
+  .sidebar-foot {
+    margin-top: auto; padding: 12px; border-top: 1px solid var(--border);
+    display: flex; align-items: center; gap: 10px;
+  }
+  .avatar { width: 34px; height: 34px; border-radius: 50%; background: var(--bg-soft);
+    display: grid; place-items: center; font-weight: 700; font-size: 0.8rem; color: var(--fg-soft); }
+  .avatar-meta { font-size: 0.78rem; }
+  .avatar-meta b { display: block; font-weight: 600; }
+  .avatar-meta span { color: var(--muted); font-size: 0.72rem; }
+
+  /* ---------- Main ---------- */
+  .main { padding: 36px 44px 64px; max-width: 1080px; }
+
+  .page-head { display: flex; justify-content: space-between; align-items: flex-end; margin-bottom: 28px; }
+  .page-head h1 { font-size: 1.7rem; font-weight: 700; letter-spacing: -0.02em; }
+  .page-head .date { color: var(--muted); font-size: 0.92rem; font-weight: 500; margin-top: 2px; }
+  .page-actions { display: flex; gap: 10px; }
+
+  /* ---------- Stat cards ---------- */
+  .stats { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; margin-bottom: 24px; }
+  .stat {
+    background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius);
+    padding: 18px 20px; box-shadow: var(--shadow-sm);
+  }
+  .stat-label { font-size: 0.78rem; color: var(--muted); font-weight: 600; display: flex; align-items: center; gap: 8px; }
+  .stat-label svg { width: 15px; height: 15px; }
+  .stat-value { font-size: 1.7rem; font-weight: 700; letter-spacing: -0.02em; margin-top: 8px; }
+  .stat-value small { font-size: 0.9rem; font-weight: 500; color: var(--muted); }
+  .stat-foot { font-size: 0.78rem; color: var(--muted); margin-top: 6px; }
+
+  /* ---------- Card ---------- */
+  .card {
+    background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius);
+    padding: 24px; box-shadow: var(--shadow-sm); margin-bottom: 20px;
+  }
+  .card-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 18px; }
+  .card-head h2 { font-size: 1.12rem; font-weight: 700; letter-spacing: -0.01em; }
+  .card-head h3 { font-size: 1.02rem; font-weight: 600; }
+
+  /* ---------- Status pill ---------- */
+  .pill { display: inline-flex; align-items: center; gap: 7px; padding: 5px 12px; border-radius: 999px;
+    font-size: 0.8rem; font-weight: 600; }
+  .pill .dot { width: 7px; height: 7px; border-radius: 50%; }
+  .pill-active { background: var(--success-soft); color: #15803d; }
+  .pill-active .dot { background: var(--success); box-shadow: 0 0 0 3px rgba(22,163,74,0.2); animation: pulse 1.8s infinite; }
+  .pill-idle { background: var(--warning-soft); color: #b45309; }
+  .pill-idle .dot { background: var(--warning); }
+  .pill-locked { background: var(--danger-soft); color: #be123c; }
+  .pill-locked .dot { background: var(--danger); }
+  @keyframes pulse { 0%,100% { opacity: 1; } 50% { opacity: .4; } }
+
+  .badge-booked { color: var(--success); font-weight: 600; }
+  .badge-unbooked { color: var(--danger); font-weight: 600; }
+  .badge-booked::before, .badge-unbooked::before { content: "●"; margin-right: 5px; font-size: 0.7rem; }
+
+  /* ---------- Timeline ---------- */
+  .timeline-wrap { margin: 4px 0 8px; }
+  .timeline-axis { display: flex; justify-content: space-between; font-size: 0.7rem; color: var(--muted); margin-bottom: 8px; font-variant-numeric: tabular-nums; }
+  .timeline {
+    height: 56px; background: var(--bg-soft); border-radius: var(--radius-sm); position: relative; overflow: hidden;
+    border: 1px solid var(--border);
+  }
+  .tl-block {
+    position: absolute; top: 6px; bottom: 6px; border-radius: 7px;
+    background: linear-gradient(180deg, #818cf8, #6366f1);
+    display: flex; align-items: center; justify-content: center;
+    color: #fff; font-size: 0.72rem; font-weight: 600; font-variant-numeric: tabular-nums;
+    box-shadow: 0 2px 6px rgba(99,102,241,0.3);
+    overflow: hidden; white-space: nowrap; padding: 0 6px;
+    cursor: default;
+  }
+  .tl-block.manual { background: linear-gradient(180deg, #5eead4, #14b8a6); box-shadow: 0 2px 6px rgba(20,184,166,0.3); }
+  .tl-block.running { background: linear-gradient(180deg, #34d399, #16a34a); box-shadow: 0 2px 8px rgba(22,163,74,0.4); }
+  .tl-now { position: absolute; top: -2px; bottom: -2px; width: 2px; background: var(--danger);
+    box-shadow: 0 0 0 4px rgba(225,29,72,0.18); border-radius: 2px; }
+  .tl-now::after { content: "Jetzt"; position: absolute; top: -22px; left: 50%; transform: translateX(-50%);
+    font-size: 0.66rem; font-weight: 700; color: var(--danger); background: var(--surface); padding: 1px 6px; border-radius: 5px; white-space: nowrap; }
+  .tl-legend { display: flex; gap: 18px; margin-top: 12px; font-size: 0.78rem; color: var(--muted); }
+  .tl-legend span { display: inline-flex; align-items: center; gap: 6px; }
+  .tl-legend i { width: 11px; height: 11px; border-radius: 4px; display: inline-block; }
+  .i-det { background: #6366f1; } .i-man { background: #14b8a6; } .i-run { background: #16a34a; } .i-now { background: var(--danger); border-radius: 2px; width: 3px; height: 12px; }
+
+  /* ---------- Table ---------- */
+  table { width: 100%; border-collapse: collapse; }
+  thead th { text-align: left; font-size: 0.74rem; text-transform: uppercase; letter-spacing: 0.05em;
+    color: var(--muted); font-weight: 600; padding: 0 12px 10px; border-bottom: 1px solid var(--border); }
+  tbody td { padding: 12px; border-bottom: 1px solid var(--border); font-size: 0.9rem; vertical-align: middle; }
+  tbody tr:last-child td { border-bottom: none; }
+  tbody tr:hover { background: var(--surface-2); }
+  td .time { font-variant-numeric: tabular-nums; font-weight: 600; }
+  td .time .sep { color: var(--muted); margin: 0 4px; }
+  .src { font-size: 0.78rem; padding: 3px 9px; border-radius: 6px; font-weight: 600; }
+  .src-auto { background: var(--accent-soft); color: var(--accent-strong); }
+  .src-manual { background: #ccfbf1; color: #0f766e; }
+  .row-ignored td { color: var(--muted); }
+  .row-ignored .time { text-decoration: line-through; }
+  .tag-ignored { font-size: 0.7rem; color: var(--muted); margin-left: 6px; }
+
+  /* ---------- Buttons ---------- */
+  .btn { display: inline-flex; align-items: center; gap: 7px; padding: 9px 16px; border-radius: var(--radius-sm);
+    border: 1px solid transparent; font: inherit; font-size: 0.88rem; font-weight: 600; cursor: pointer;
+    text-decoration: none; transition: all .15s; }
+  .btn svg { width: 16px; height: 16px; }
+  .btn-primary { background: var(--accent); color: #fff; box-shadow: 0 2px 8px rgba(99,102,241,0.3); }
+  .btn-primary:hover { background: var(--accent-strong); }
+  .btn-ghost { background: var(--surface); border-color: var(--border-strong); color: var(--fg-soft); }
+  .btn-ghost:hover { background: var(--bg-soft); color: var(--fg); }
+  .btn-sm { padding: 6px 11px; font-size: 0.8rem; border-radius: 8px; }
+  .btn-danger-ghost { color: var(--danger); border-color: transparent; background: transparent; }
+  .btn-danger-ghost:hover { background: var(--danger-soft); }
+
+  .row-actions { display: flex; gap: 6px; }
+
+  /* ---------- Mini week strip ---------- */
+  .week-strip { display: grid; grid-template-columns: repeat(7, 1fr); gap: 10px; }
+  .ws-day { background: var(--surface-2); border: 1px solid var(--border); border-radius: 12px; padding: 14px;
+    text-decoration: none; color: inherit; transition: all .15s; position: relative; }
+  .ws-day:hover { border-color: var(--accent); transform: translateY(-2px); box-shadow: var(--shadow-sm); }
+  .ws-day.today { border-color: var(--accent); background: var(--accent-soft); }
+  .ws-dow { font-size: 0.72rem; color: var(--muted); font-weight: 600; text-transform: uppercase; letter-spacing: 0.04em; }
+  .ws-num { font-size: 1.3rem; font-weight: 700; letter-spacing: -0.02em; margin: 2px 0 10px; }
+  .ws-bar { height: 6px; background: var(--bg-soft); border-radius: 3px; overflow: hidden; margin-bottom: 8px; }
+  .ws-bar i { display: block; height: 100%; background: linear-gradient(90deg, #818cf8, #6366f1); border-radius: 3px; }
+  .ws-meta { display: flex; justify-content: space-between; font-size: 0.74rem; color: var(--muted); font-variant-numeric: tabular-nums; }
+  .ws-day.booked .ws-bar i { background: linear-gradient(90deg, #34d399, #16a34a); }
+  .ws-b { font-size: 0.68rem; }
+  .ws-b.booked { color: var(--success); }
+  .ws-b.unbooked { color: var(--danger); }
+
+  .summary-line { display: flex; gap: 24px; flex-wrap: wrap; margin-top: 16px; padding-top: 16px; border-top: 1px solid var(--border);
+    font-size: 0.85rem; color: var(--fg-soft); }
+  .summary-line b { color: var(--fg); font-weight: 700; font-variant-numeric: tabular-nums; }
+
+  .note-muted { color: var(--muted); }
+
+  @media (max-width: 920px) {
+    .app { grid-template-columns: 1fr; }
+    .sidebar { position: fixed; transform: translateX(-100%); }
+    .stats { grid-template-columns: repeat(2, 1fr); }
+    .main { padding: 24px 18px; }
+  }
+</style>
+</head>
+<body>
+<div class="app">
+
+  <!-- Sidebar -->
+  <aside class="sidebar">
+    <div class="brand">
+      <div class="brand-mark">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+          <circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/>
+        </svg>
+      </div>
+      <div>
+        <div class="brand-name">Zeitspur</div>
+        <div class="brand-sub">Arbeitszeit · lokal</div>
+      </div>
+    </div>
+
+    <div class="nav-label">Ansicht</div>
+    <a class="nav-item active" href="#">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>
+      Heute
+    </a>
+    <a class="nav-item" href="#">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="17" rx="2"/><path d="M3 9h18M8 2v4M16 2v4"/></svg>
+      Woche
+    </a>
+    <a class="nav-item" href="#">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="17" rx="2"/><path d="M3 9h18M8 2v4M16 2v4M8 14h3M8 18h6"/></svg>
+      Monat
+    </a>
+
+    <div class="nav-label">Verwaltung</div>
+    <a class="nav-item" href="#">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 11l3 3 8-8"/><path d="M20 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>
+      Buchung
+    </a>
+    <a class="nav-item" href="#">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19V5a2 2 0 0 1 2-2h12a2 2 0 0 1 2 2v14l-4-2-4 2-4-2-4 2z"/></svg>
+      Abschlüsse
+    </a>
+    <a class="nav-item" href="#">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+      Einstellungen
+    </a>
+
+    <div class="sidebar-foot">
+      <div class="avatar">SM</div>
+      <div class="avatar-meta"><b>Lokal</b><span>127.0.0.1:8787</span></div>
+    </div>
+  </aside>
+
+  <!-- Main -->
+  <main class="main">
+    <div class="page-head">
+      <div>
+        <h1>Heute</h1>
+        <div class="date">Donnerstag, 18. Juni 2026</div>
+      </div>
+      <div class="page-actions">
+        <a class="btn btn-ghost" href="#"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a9 9 0 1 1-3-6.7L21 8"/><path d="M21 3v5h-5"/></svg> Aktualisieren</a>
+        <button class="btn btn-primary"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14M5 12h14"/></svg> Block hinzufügen</button>
+      </div>
+    </div>
+
+    <!-- Stats -->
+    <div class="stats">
+      <div class="stat">
+        <div class="stat-label"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg>Status</div>
+        <div class="stat-value" style="font-size:1.15rem;margin-top:10px"><span class="pill pill-active"><span class="dot"></span>Aktiv</span></div>
+        <div class="stat-foot">seit 14:15 Uhr</div>
+      </div>
+      <div class="stat">
+        <div class="stat-label"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>Gearbeitet</div>
+        <div class="stat-value">6<small>h</small> 24<small>min</small></div>
+        <div class="stat-foot">Ziel 8h · 80%</div>
+      </div>
+      <div class="stat">
+        <div class="stat-label"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 1l4 4-4 4"/><path d="M3 11V9a4 4 0 0 1 4-4h14"/><path d="M7 23l-4-4 4-4"/><path d="M21 13v2a4 4 0 0 1-4 4H3"/></svg>Pause</div>
+        <div class="stat-value">0<small>h</small> 45<small>min</small></div>
+        <div class="stat-foot">automatisch erfasst</div>
+      </div>
+      <div class="stat">
+        <div class="stat-label"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 11l3 3 8-8"/><path d="M20 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>Buchung</div>
+        <div class="stat-value" style="font-size:1.15rem;margin-top:10px"><span class="badge-unbooked">nicht gebucht</span></div>
+        <div class="stat-foot">Buchungstag: 20.06.</div>
+      </div>
+    </div>
+
+    <!-- Timeline -->
+    <div class="card">
+      <div class="card-head">
+        <h2>Tagesverlauf</h2>
+        <span class="pill pill-active"><span class="dot"></span>Aktiver Block · 87 min</span>
+      </div>
+      <div class="timeline-wrap">
+        <div class="timeline-axis">
+          <span>00:00</span><span>06:00</span><span>12:00</span><span>18:00</span><span>24:00</span>
+        </div>
+        <div class="timeline">
+          <!-- block 09:12 - 12:30  => 38.3% .. 52.1% -->
+          <div class="tl-block" style="left:38.3%;width:13.8%" title="09:12 – 12:30 · Automatisch">3:18</div>
+          <!-- block 13:15 - 14:00 => 55.2% .. 58.3% -->
+          <div class="tl-block" style="left:55.2%;width:3.1%" title="13:15 – 14:00 · Manuell">0:45</div>
+          <!-- block 14:15 - now(15:42) => 59.4% .. 65.8% running -->
+          <div class="tl-block running" style="left:59.4%;width:6.4%" title="14:15 – läuft · Automatisch">1:27</div>
+          <div class="tl-now" style="left:65.8%"></div>
+        </div>
+        <div class="tl-legend">
+          <span><i class="i-det"></i>Automatisch erfasst</span>
+          <span><i class="i-man"></i>Manuell hinzugefügt</span>
+          <span><i class="i-run"></i>Laufender Block</span>
+          <span><i class="i-now"></i>Aktuelle Zeit</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Work blocks -->
+    <div class="card">
+      <div class="card-head">
+        <h2>Arbeitsblöcke</h2>
+        <a class="btn btn-ghost btn-sm" href="#"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14M5 12h14"/></svg> Manuell hinzufügen</a>
+      </div>
+      <table>
+        <thead>
+          <tr><th>Start</th><th>Ende</th><th>Quelle</th><th>Notiz</th><th style="text-align:right">Aktionen</th></tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><span class="time">09<span class="sep">:</span>12</span></td>
+            <td><span class="time">12<span class="sep">:</span>30</span></td>
+            <td><span class="src src-auto">Automatisch</span></td>
+            <td class="note-muted">—</td>
+            <td style="text-align:right"><div class="row-actions" style="justify-content:flex-end">
+              <button class="btn btn-ghost btn-sm">Ignorieren</button>
+            </div></td>
+          </tr>
+          <tr>
+            <td><span class="time">13<span class="sep">:</span>15</span></td>
+            <td><span class="time">14<span class="sep">:</span>00</span></td>
+            <td><span class="src src-manual">Manuell</span></td>
+            <td>Kunde: Akme GmbH</td>
+            <td style="text-align:right"><div class="row-actions" style="justify-content:flex-end">
+              <button class="btn btn-ghost btn-sm">Ignorieren</button>
+              <button class="btn btn-danger-ghost btn-sm">Löschen</button>
+            </div></td>
+          </tr>
+          <tr>
+            <td><span class="time">14<span class="sep">:</span>15</span></td>
+            <td><span class="time" style="color:var(--success)">läuft</span></td>
+            <td><span class="src src-auto">Automatisch</span></td>
+            <td class="note-muted">—</td>
+            <td style="text-align:right"><div class="row-actions" style="justify-content:flex-end">
+              <button class="btn btn-ghost btn-sm">Ignorieren</button>
+            </div></td>
+          </tr>
+          <tr class="row-ignored">
+            <td><span class="time">08<span class="sep">:</span>02</span></td>
+            <td><span class="time">08<span class="sep">:</span>14</span></td>
+            <td><span class="src src-auto">Automatisch<span class="tag-ignored">(ignoriert)</span></span></td>
+            <td class="note-muted">Kurzmeldung</td>
+            <td style="text-align:right"><div class="row-actions" style="justify-content:flex-end">
+              <button class="btn btn-ghost btn-sm">Zurücksetzen</button>
+            </div></td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <!-- Week preview -->
+    <div class="card">
+      <div class="card-head">
+        <h2>Diese Woche</h2>
+        <a class="btn btn-ghost btn-sm" href="#">Woche ansehen →</a>
+      </div>
+      <div class="week-strip">
+        <a class="ws-day" href="#"><div class="ws-dow">Mo</div><div class="ws-num">15</div><div class="ws-bar"><i style="width:88%"></i></div><div class="ws-meta"><span>7h 02</span><span class="ws-b booked">●</span></div></a>
+        <a class="ws-day booked" href="#"><div class="ws-dow">Di</div><div class="ws-num">16</div><div class="ws-bar"><i style="width:92%"></i></div><div class="ws-meta"><span>7h 24</span><span class="ws-b booked">●</span></div></a>
+        <a class="ws-day booked" href="#"><div class="ws-dow">Mi</div><div class="ws-num">17</div><div class="ws-bar"><i style="width:79%"></i></div><div class="ws-meta"><span>6h 19</span><span class="ws-b booked">●</span></div></a>
+        <a class="ws-day today" href="#"><div class="ws-dow">Do</div><div class="ws-num">18</div><div class="ws-bar"><i style="width:80%"></i></div><div class="ws-meta"><span>6h 24</span><span class="ws-b unbooked">○</span></div></a>
+        <a class="ws-day" href="#"><div class="ws-dow">Fr</div><div class="ws-num">19</div><div class="ws-bar"><i style="width:0%"></i></div><div class="ws-meta"><span>—</span><span class="ws-b unbooked">○</span></div></a>
+        <a class="ws-day" href="#" style="opacity:.5"><div class="ws-dow">Sa</div><div class="ws-num">20</div><div class="ws-bar"><i style="width:0%"></i></div><div class="ws-meta"><span>—</span><span class="ws-b" style="color:var(--muted)">·</span></div></a>
+        <a class="ws-day" href="#" style="opacity:.5"><div class="ws-dow">So</div><div class="ws-num">21</div><div class="ws-bar"><i style="width:0%"></i></div><div class="ws-meta"><span>—</span><span class="ws-b" style="color:var(--muted)">·</span></div></a>
+      </div>
+      <div class="summary-line">
+        <span>Gesamt: <b>27h 09</b></span>
+        <span>Gebuchte Tage: <b>3</b></span>
+        <span>Ungebuchte Tage: <b>2</b></span>
+        <span>Periode bis <b>20.06.</b></span>
+      </div>
+    </div>
+
+  </main>
+</div>
+</body>
+</html>

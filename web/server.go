@@ -232,6 +232,7 @@ func (s *Server) renderLayout(w http.ResponseWriter, r *http.Request, name strin
 	data["CSRFToken"] = csrfToken(r)
 	data["Lang"] = string(locale)
 	data["Locale"] = locale
+	s.addActivityStatusData(r.Context(), data)
 	setTranslatedTitles(data, s.catalog, locale)
 	page, ok := s.templates[locale][name]
 	if !ok {
@@ -247,6 +248,19 @@ func (s *Server) renderLayout(w http.ResponseWriter, r *http.Request, name strin
 	}
 	w.WriteHeader(status)
 	_, _ = buf.WriteTo(w)
+}
+
+func (s *Server) addActivityStatusData(ctx context.Context, data map[string]any) {
+	if _, ok := data["ActivityStatus"].(string); ok {
+		return
+	}
+	state := activity.ActivityUnknown
+	if s.provider != nil {
+		if current, err := s.provider.CurrentState(ctx); err == nil {
+			state = current
+		}
+	}
+	data["ActivityStatus"] = string(state)
 }
 
 // setTranslatedTitles converts raw title strings to translated text when the

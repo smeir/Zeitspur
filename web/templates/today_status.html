@@ -1,14 +1,33 @@
 {{ define "today_status" }}
-<div class="card" hx-get="/today/status" hx-trigger="every 10s" hx-swap="outerHTML">
-  <h2>{{ Tf "TodayDate" (dict "Date" (dateShort .DateObj)) }}</h2>
-  <p>
-    {{ T "Status" }}:
-    <span class="status-badge status-{{ .Status }}">{{ statusLabel .Status }}</span>
-  </p>
-  {{ if .CurrentBlockStart }}
-    <p>{{ Tf "CurrentBlockStarted" (dict "Time" (.CurrentBlockStart.Format "15:04") "Minutes" .RunningMinutes) }}</p>
-  {{ end }}
-  <p>{{ T "Worked" }}: {{ formatMinutes .WorkedMinutes }} &middot; {{ T "Pause" }}: {{ formatMinutes .PauseMinutes }}</p>
-  <p>{{ T "Booking" }}: <span class="{{ if .Booked }}booked{{ else }}unbooked{{ end }}">{{ bookedLabel .Booked }}</span></p>
+<section class="hero"{{ if .IsToday }} hx-get="/today/status" hx-trigger="every 10s" hx-swap="outerHTML"{{ end }}>
+  <div class="hero-row">
+    <div>
+      <h1>{{ .TodayHeadline }}</h1>
+      <div class="date">{{ .TodaySubline }}</div>
+    </div>
+    <span class="hero-status hero-status-{{ .ActivityStatus }}"><span class="dot"></span>{{ statusLabel .ActivityStatus }}</span>
   </div>
-  {{ end }}
+  <div class="hero-stats">
+    <div class="hs">
+      <div class="hs-label">{{ T "Worked" }}</div>
+      <div class="hs-value">{{ formatMinutes .WorkedMinutes }}</div>
+      <div class="hs-sub">{{ T "TargetEightHours" }}</div>
+    </div>
+    <div class="hs">
+      <div class="hs-label">{{ T "Pause" }}</div>
+      <div class="hs-value">{{ formatMinutes .PauseMinutes }}</div>
+      <div class="hs-sub">{{ T "CapturedAutomatically" }}</div>
+    </div>
+    <div class="hs">
+      <div class="hs-label">{{ T "Blocks" }}</div>
+      <div class="hs-value">{{ .ActiveBlockCount }}</div>
+      <div class="hs-sub">{{ Tf "OpenBlocks" (dict "Count" .OpenBlockCount) }}</div>
+    </div>
+    <div class="hs">
+      <div class="hs-label">{{ T "Booking" }}</div>
+      <div class="hs-value hs-booking">{{ bookedLabel .Booked }}</div>
+      <div class="hs-sub">{{ T "LocalOnly" }}</div>
+    </div>
+  </div>
+</section>
+{{ end }}
