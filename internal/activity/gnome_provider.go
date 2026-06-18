@@ -70,9 +70,9 @@ func (g *GNOMEProvider) CurrentState(ctx context.Context) (ActivityState, error)
 }
 
 func (g *GNOMEProvider) isLocked(ctx context.Context) (bool, error) {
-	obj := g.conn.Object("org.gnome.desktop.screensaver", "/org/gnome/desktop/screensaver")
+	obj := g.conn.Object("org.gnome.ScreenSaver", "/org/gnome/ScreenSaver")
 	var locked bool
-	err := obj.CallWithContext(ctx, "org.gnome.desktop.screensaver.GetActive", 0).Store(&locked)
+	err := obj.CallWithContext(ctx, "org.gnome.ScreenSaver.GetActive", 0).Store(&locked)
 	if err == nil {
 		return locked, nil
 	}
