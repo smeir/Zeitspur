@@ -71,6 +71,46 @@ func printUsage() {
 	fmt.Fprintf(os.Stderr, "Usage: zeitspur <serve|status|open|install|uninstall|version>\n")
 }
 
+type autoProvider struct {
+	idleThreshold time.Duration
+	current       activity.ActivityProvider
+}
+
+func (a *autoProvider) Name() string {
+	if a.current != nil {
+		return a.current.Name()
+	}
+	return "auto"
+}
+
+func (a *autoProvider) CurrentState(ctx context.Context) (activity.ActivityState, error) {
+	if a.current == nil {
+		var err error
+		a.current, err = activity.NewGNOMEProvider(a.idleThreshold)
+		if err != nil {
+			a.current, err = activity.NewFreedesktopProvider(a.idleThreshold)
+		}
+		if err != nil {
+			return activity.ActivityUnknown, fmt.Errorf("no d-bus provider available: %w", err)
+		}
+	}
+
+	state, err := a.current.CurrentState(ctx)
+	if err != nil {
+		_ = a.current.Close()
+		a.current = nil
+		return activity.ActivityUnknown, err
+	}
+	return state, nil
+}
+
+func (a *autoProvider) Close() error {
+	if a.current != nil {
+		return a.current.Close()
+	}
+	return nil
+}
+
 func setup() (config.Config, config.Paths, *sql.DB, activity.ActivityProvider, error) {
 	paths, err := config.DefaultPaths()
 	if err != nil {
@@ -99,16 +139,7 @@ func setup() (config.Config, config.Paths, *sql.DB, activity.ActivityProvider, e
 		return config.Config{}, config.Paths{}, nil, nil, err
 	}
 
-	var provider activity.ActivityProvider
-	provider, err = activity.NewGNOMEProvider(cfg.IdleThreshold())
-	if err != nil {
-		slog.Warn("GNOME D-Bus provider unavailable; trying freedesktop", "error", err)
-		provider, err = activity.NewFreedesktopProvider(cfg.IdleThreshold())
-		if err != nil {
-			slog.Warn("freedesktop D-Bus provider unavailable; falling back to mock", "error", err)
-			provider = activity.NewMockProvider(activity.ActivityUnknown)
-		}
-	}
+	provider := &autoProvider{idleThreshold: cfg.IdleThreshold()}
 
 	return cfg, paths, db, provider, nil
 }

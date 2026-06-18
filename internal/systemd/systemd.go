@@ -22,7 +22,7 @@ NoNewPrivileges=true
 PrivateTmp=true
 
 [Install]
-WantedBy=default.target
+WantedBy=graphical-session.target
 `
 
 // Paths holds the filesystem paths for the systemd unit.
