@@ -107,18 +107,22 @@ func (e *Engine) tick(ctx context.Context) error {
 
 	now := e.clock.Now()
 
+	// Check for unexpected large gaps in polling (e.g. system suspend/hibernate)
+	// while we were active. We do this before processing the current state so
+	// we don't miss the gap if we wake up directly into a locked or idle state.
+	if e.lastState == ActivityActive && !e.lastActiveAt.IsZero() {
+		gap := now.Sub(e.lastActiveAt)
+		if gap > e.idleThreshold+2*e.pollInterval {
+			if err := e.insertEventAt(ctx, EventSuspend, e.lastActiveAt, nil); err != nil {
+				return err
+			}
+			e.lastState = ActivitySuspended
+			e.reconcileCurrentDay(ctx, e.lastActiveAt)
+		}
+	}
+
 	switch state {
 	case ActivityActive:
-		if e.lastState == ActivityActive && !e.lastActiveAt.IsZero() {
-			gap := now.Sub(e.lastActiveAt)
-			if gap > e.idleThreshold+2*e.pollInterval {
-				if err := e.insertEventAt(ctx, EventSuspend, e.lastActiveAt, nil); err != nil {
-					return err
-				}
-				e.lastState = ActivitySuspended
-			}
-		}
-
 		e.lastActiveAt = now
 		if e.lastState != ActivityActive {
 			eventType := EventActive

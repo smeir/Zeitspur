@@ -53,8 +53,8 @@ func TestEngine_ActiveToIdleTransition(t *testing.T) {
 
 	eng.Process(ctx)
 
-	// Transition to idle after threshold.
-	clk.Set(start.Add(4 * time.Minute))
+	// Transition to idle at exactly the threshold.
+	clk.Set(start.Add(3 * time.Minute))
 	mock.SetState(ActivityIdle)
 	eng.Process(ctx)
 
