@@ -58,6 +58,20 @@ func (e *Engine) restoreState(ctx context.Context) {
 	case EventActive, EventUnlocked, EventResume:
 		e.lastState = ActivityActive
 		e.lastActiveAt = occurredAt
+
+		// Recover the last known active time from work_blocks.
+		// If the engine crashed without writing a suspend event, the reconciler
+		// had updated the projected work_blocks ended_at on every tick.
+		var lastEnded sql.NullString
+		err := e.db.QueryRowContext(ctx, `
+			SELECT MAX(ended_at) FROM work_blocks 
+			WHERE status = 'active' AND source = 'detected' AND ended_at > ?
+		`, ts).Scan(&lastEnded)
+		if err == nil && lastEnded.Valid {
+			if endedAt, err := time.Parse(time.RFC3339Nano, lastEnded.String); err == nil {
+				e.lastActiveAt = endedAt
+			}
+		}
 	case EventIdle:
 		e.lastState = ActivityIdle
 	case EventLocked:
