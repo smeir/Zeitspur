@@ -35,7 +35,7 @@ Only high-level state transitions with timestamps are stored:
 
 ```text
 zeitspur/
-├── cmd/zeitspur/          CLI entry point (serve|status|open|install|uninstall)
+├── cmd/zeitspur/          CLI entry point (serve|status|open|install|uninstall|version)
 ├── internal/
 │   ├── activity/          activity detection: engine, reconciler, providers (GNOME/Mock)
 │   ├── booking/           per-day booking state and the manual Booking Day
@@ -44,6 +44,7 @@ zeitspur/
 │   ├── database/          SQLite connection and embedded migrations
 │   ├── systemd/           user service installation
 │   ├── timeline/          working-time calculation (day/range summaries)
+│   ├── i18n/              German/English translation catalog
 │   ├── clock/             testable clock abstraction
 │   └── timeutil/          small time-formatting helpers
 ├── web/                   embedded HTML templates, CSS, HTMX, HTTP handlers

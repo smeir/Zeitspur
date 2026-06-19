@@ -45,13 +45,14 @@ zeitspur/
 │   ├── booking/           day booking state and Booking Day
 │   ├── closure/           booking-period closure and snapshots
 │   ├── config/            TOML configuration
-│   ├── database/          SQLite migrations and connection
+│   ├── database/          SQLite connection and embedded migrations
 │   ├── systemd/           user service installation
 │   ├── timeline/          working-time calculations
-│   └── clock/             testable clock abstraction
+│   ├── i18n/              German/English translation catalog
+│   ├── clock/             testable clock abstraction
+│   └── timeutil/          small time-formatting helpers
 ├── web/                   embedded HTML templates, CSS, and HTMX
-├── migrations/            embedded SQLite schema migrations
-├── packaging/             packaging helpers
+├── scripts/               architectural import-boundary check
 ├── go.mod
 ├── Makefile
 ├── config.example.toml
@@ -156,6 +157,8 @@ listen_address = "127.0.0.1:8787"
 
 [app]
 timezone = "local" # or an IANA timezone such as "Europe/Berlin"
+language = "de"    # "de" or "en"
+today_weekdays = ["mon", "tue", "wed", "thu", "fri"] # Today view week chart days
 ```
 
 Changes to `listen_address` and `timezone` require a service restart to take full effect.

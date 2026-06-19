@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 	"time"
 
 	"github.com/BurntSushi/toml"
@@ -19,6 +20,27 @@ const (
 	DefaultTimezone      = "local"
 	DefaultLanguage      = "de"
 )
+
+var defaultTodayWeekdays = []string{"mon", "tue", "wed", "thu", "fri"}
+
+// Weekday pairs a config token (e.g. "mon") with its time.Weekday.
+type Weekday struct {
+	Token   string
+	Weekday time.Weekday
+}
+
+// WeekdayOrder is the single source of truth for the weekday vocabulary, in
+// Monday-first display order. It drives parsing, validation, and the settings
+// UI so the token list never has to be repeated.
+var WeekdayOrder = []Weekday{
+	{"mon", time.Monday},
+	{"tue", time.Tuesday},
+	{"wed", time.Wednesday},
+	{"thu", time.Thursday},
+	{"fri", time.Friday},
+	{"sat", time.Saturday},
+	{"sun", time.Sunday},
+}
 
 // Config is the runtime configuration for Zeitspur.
 type Config struct {
@@ -40,8 +62,9 @@ type ServerConfig struct {
 
 // AppConfig holds general application settings.
 type AppConfig struct {
-	Timezone string `toml:"timezone"`
-	Language string `toml:"language"`
+	Timezone      string   `toml:"timezone"`
+	Language      string   `toml:"language"`
+	TodayWeekdays []string `toml:"today_weekdays"`
 }
 
 // Duration helpers after parsing.
@@ -50,6 +73,21 @@ func (c Config) PollInterval() time.Duration {
 }
 func (c Config) IdleThreshold() time.Duration {
 	return parseDuration(c.Activity.IdleThreshold, DefaultIdleThreshold)
+}
+
+// TodayWeekdays returns the weekdays shown in the Today view week chart.
+func (c Config) TodayWeekdays() []time.Weekday {
+	values := c.App.TodayWeekdays
+	if len(values) == 0 {
+		values = defaultTodayWeekdays
+	}
+	weekdays := make([]time.Weekday, 0, len(values))
+	for _, value := range values {
+		if wd, ok := parseWeekday(value); ok {
+			weekdays = append(weekdays, wd)
+		}
+	}
+	return weekdays
 }
 
 func parseDuration(s string, def time.Duration) time.Duration {
@@ -98,8 +136,9 @@ func Load(path string) (Config, error) {
 			ListenAddress: DefaultListenAddress,
 		},
 		App: AppConfig{
-			Timezone: DefaultTimezone,
-			Language: DefaultLanguage,
+			Timezone:      DefaultTimezone,
+			Language:      DefaultLanguage,
+			TodayWeekdays: append([]string(nil), defaultTodayWeekdays...),
 		},
 	}
 
@@ -167,5 +206,29 @@ func (c Config) Validate() error {
 	if c.App.Language != "" && c.App.Language != "de" && c.App.Language != "en" {
 		return fmt.Errorf("invalid language %q: must be 'de' or 'en'", c.App.Language)
 	}
+	if c.App.TodayWeekdays != nil && len(c.App.TodayWeekdays) == 0 {
+		return fmt.Errorf("today_weekdays must contain at least one valid weekday")
+	}
+	seen := make(map[time.Weekday]bool, len(c.App.TodayWeekdays))
+	for _, value := range c.App.TodayWeekdays {
+		weekday, ok := parseWeekday(value)
+		if !ok {
+			return fmt.Errorf("invalid today_weekdays value %q: use mon, tue, wed, thu, fri, sat, or sun", value)
+		}
+		if seen[weekday] {
+			return fmt.Errorf("duplicate today_weekdays value %q", value)
+		}
+		seen[weekday] = true
+	}
 	return nil
+}
+
+func parseWeekday(value string) (time.Weekday, bool) {
+	normalized := strings.ToLower(strings.TrimSpace(value))
+	for _, wd := range WeekdayOrder {
+		if wd.Token == normalized {
+			return wd.Weekday, true
+		}
+	}
+	return time.Sunday, false
 }

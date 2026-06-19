@@ -173,10 +173,18 @@ type weekChartDayView struct {
 	Date          string
 	Label         string
 	WorkedMinutes int
+	TopLabel      string
+	BottomLabel   string
 	Booked        bool
 	IsToday       bool
 	IsFuture      bool
 	HeightPercent int
+}
+
+type settingsWeekdayOption struct {
+	Value    string
+	Label    string
+	Selected bool
 }
 
 func (s *Server) blocksForDay(ctx context.Context, date string) ([]blockView, error) {
@@ -430,20 +438,33 @@ func (s *Server) weekChart(ctx context.Context, now time.Time) ([]weekChartDayVi
 	days, err := timeline.NewService(s.db).Range(ctx, start.Format("2006-01-02"), end.Format("2006-01-02"))
 	byDate := make(map[string]*timeline.DaySummary, len(days))
 	maxMinutes := 1
-	total, booked, unbooked := 0, 0, 0
 	if err == nil {
 		for _, d := range days {
 			byDate[d.Date] = d
-			total += d.WorkedMinutes
-			if d.WorkedMinutes > maxMinutes {
-				maxMinutes = d.WorkedMinutes
-			}
+		}
+	}
+
+	configuredWeekdays := make(map[time.Weekday]bool)
+	for _, weekday := range s.config().TodayWeekdays() {
+		configuredWeekdays[weekday] = true
+	}
+	for i := 0; i < 7; i++ {
+		day := start.AddDate(0, 0, i)
+		if !configuredWeekdays[day.Weekday()] {
+			continue
+		}
+		if summary := byDate[day.Format("2006-01-02")]; summary != nil && summary.WorkedMinutes > maxMinutes {
+			maxMinutes = summary.WorkedMinutes
 		}
 	}
 
 	var result []weekChartDayView
+	total, booked, unbooked := 0, 0, 0
 	for i := 0; i < 7; i++ {
 		day := start.AddDate(0, 0, i)
+		if !configuredWeekdays[day.Weekday()] {
+			continue
+		}
 		date := day.Format("2006-01-02")
 		summary := byDate[date]
 		worked := 0
@@ -452,6 +473,7 @@ func (s *Server) weekChart(ctx context.Context, now time.Time) ([]weekChartDayVi
 			worked = summary.WorkedMinutes
 			isBooked = summary.Booked
 		}
+		total += worked
 		if isBooked {
 			booked++
 		} else if worked > 0 && !day.After(now) {
@@ -467,6 +489,8 @@ func (s *Server) weekChart(ctx context.Context, now time.Time) ([]weekChartDayVi
 			Date:          date,
 			Label:         fmt.Sprintf("%s %d", i18n.WeekdayShort(day, s.locale()), day.Day()),
 			WorkedMinutes: worked,
+			TopLabel:      weekChartTopLabel(worked),
+			BottomLabel:   weekChartBottomLabel(worked),
 			Booked:        isBooked,
 			IsToday:       sameDate(day, now),
 			IsFuture:      day.After(now),
@@ -474,6 +498,29 @@ func (s *Server) weekChart(ctx context.Context, now time.Time) ([]weekChartDayVi
 		})
 	}
 	return result, total, booked, unbooked
+}
+
+// weekChartTopLabel is the primary line shown inside a week-chart bar: the hour
+// count for full hours, the minute count for sub-hour durations, or a dash when
+// nothing was tracked.
+func weekChartTopLabel(minutes int) string {
+	if minutes <= 0 {
+		return "-"
+	}
+	if minutes < 60 {
+		return fmt.Sprintf("%dm", minutes)
+	}
+	return fmt.Sprintf("%dh", minutes/60)
+}
+
+// weekChartBottomLabel is the secondary minute line, only shown once at least
+// one full hour was tracked (e.g. "30m" below "1h"). Sub-hour durations carry
+// their value in the top label instead.
+func weekChartBottomLabel(minutes int) string {
+	if minutes < 60 {
+		return ""
+	}
+	return fmt.Sprintf("%02dm", minutes%60)
 }
 
 func (s *Server) bookingAside(ctx context.Context, date time.Time, booked bool) map[string]any {
@@ -857,15 +904,28 @@ func (s *Server) handleClosureDetail(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) handleSettings(w http.ResponseWriter, r *http.Request) {
-	s.renderLayout(w, r, "settings", map[string]any{
+	s.renderSettings(w, r, s.config(), "", http.StatusOK)
+}
+
+// renderSettings renders the settings form for the given config. When flash is
+// non-empty it is shown as an error banner and the form keeps the submitted
+// values, so a validation failure on save does not discard the user's edits.
+func (s *Server) renderSettings(w http.ResponseWriter, r *http.Request, cfg config.Config, flash string, status int) {
+	data := map[string]any{
 		"Title":      "PageSettings",
 		"Nav":        "settings",
-		"Config":     s.config(),
+		"Config":     cfg,
 		"ConfigPath": s.paths.ConfigFile,
 		"Timezones":  []string{"UTC", "Europe/Berlin", "Europe/London", "America/New_York", "America/Los_Angeles", "Asia/Tokyo"},
 		"Languages":  []i18n.Locale{i18n.German, i18n.English},
+		"Weekdays":   s.settingsWeekdayOptions(cfg),
 		"Version":    s.version,
-	}, http.StatusOK)
+	}
+	if flash != "" {
+		data["Flash"] = flash
+		data["FlashType"] = "error"
+	}
+	s.renderLayout(w, r, "settings", data, status)
 }
 
 func (s *Server) handleSettingsSave(w http.ResponseWriter, r *http.Request) {
@@ -877,6 +937,16 @@ func (s *Server) handleSettingsSave(w http.ResponseWriter, r *http.Request) {
 	cfg.Server.ListenAddress = r.FormValue("listen_address")
 	cfg.App.Timezone = r.FormValue("timezone")
 	cfg.App.Language = r.FormValue("language")
+	if weekdays, ok := r.Form["today_weekdays"]; ok {
+		cfg.App.TodayWeekdays = weekdays
+	} else {
+		cfg.App.TodayWeekdays = []string{}
+	}
+
+	if err := cfg.Validate(); err != nil {
+		s.renderSettings(w, r, cfg, err.Error(), http.StatusBadRequest)
+		return
+	}
 
 	if err := config.Write(s.paths.ConfigFile, cfg); err != nil {
 		slog.Error("write config failed", "error", err)
@@ -892,7 +962,23 @@ func (s *Server) handleSettingsSave(w http.ResponseWriter, r *http.Request) {
 	}
 	s.setConfig(cfg, loc)
 
-	http.Redirect(w, r, "/settings", http.StatusFound)
+	http.Redirect(w, r, "/", http.StatusFound)
+}
+
+func (s *Server) settingsWeekdayOptions(cfg config.Config) []settingsWeekdayOption {
+	selected := make(map[time.Weekday]bool)
+	for _, weekday := range cfg.TodayWeekdays() {
+		selected[weekday] = true
+	}
+	options := make([]settingsWeekdayOption, 0, len(config.WeekdayOrder))
+	for _, wd := range config.WeekdayOrder {
+		options = append(options, settingsWeekdayOption{
+			Value:    wd.Token,
+			Label:    i18n.WeekdayNameFor(wd.Weekday, s.locale()),
+			Selected: selected[wd.Weekday],
+		})
+	}
+	return options
 }
 
 func (s *Server) parseDayTimes(date, start, end string) (time.Time, time.Time, error) {

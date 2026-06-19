@@ -11,3 +11,4 @@ listen_address = "127.0.0.1:8787"
 [app]
 timezone = "local" # "local" or a valid IANA timezone such as "Europe/Berlin"
 language = "de"    # "de" or "en"
+today_weekdays = ["mon", "tue", "wed", "thu", "fri"] # Days shown in the Today view week chart.

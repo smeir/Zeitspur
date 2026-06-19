@@ -68,7 +68,7 @@
               <input type="hidden" name="csrf_token" value="{{ $.CSRFToken }}">
               <input type="hidden" name="started_at" value="{{ .StartStr }}">
               <input type="hidden" name="ended_at" value="{{ .EndStr }}">
-              <button type="submit" class="icon-btn danger" title="{{ T "Delete" }}" aria-label="{{ T "Delete" }}"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2m3 0v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"/></svg></button>
+              <button type="submit" class="icon-btn" title="{{ T "Delete" }}" aria-label="{{ T "Delete" }}"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2m3 0v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"/></svg></button>
             </form>
           {{ end }}
           </div>
@@ -80,12 +80,6 @@
   {{ else }}
     <div class="empty-state">{{ T "NoWorkBlocks" }}</div>
   {{ end }}
-  <div class="card-pad compact-pad">
-    <button type="button" class="btn btn-line" onclick="document.getElementById('manual-block-dialog').showModal()">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14M5 12h14"/></svg>{{ T "AddManualBlock" }}
-    </button>
-  </div>
-
   <dialog id="manual-block-dialog">
     <h4>{{ T "AddManualBlock" }}</h4>
     <form action="/day/{{ .Date }}/block" method="post">
@@ -320,8 +314,10 @@
         <div class="chart">
           {{ range .WeekChartDays }}
             <a class="ch-bar-wrap {{ if .IsToday }}today{{ end }}" href="/day/{{ .Date }}" style="{{ if .IsFuture }}opacity: .5;{{ end }}">
-              <div class="ch-val">{{ if gt .WorkedMinutes 0 }}{{ formatMinutes .WorkedMinutes }}{{ else }}-{{ end }}</div>
-              <div class="ch-bar {{ if .Booked }}booked{{ end }} {{ if .IsToday }}today{{ end }} {{ if eq .WorkedMinutes 0 }}empty{{ end }}" style="height: {{ .HeightPercent }}%;"></div>
+              <div class="ch-bar {{ if .Booked }}booked{{ end }} {{ if .IsToday }}today{{ end }} {{ if eq .WorkedMinutes 0 }}empty{{ end }}" style="height: {{ .HeightPercent }}%;">
+                <span>{{ .TopLabel }}</span>
+                {{ if .BottomLabel }}<span>{{ .BottomLabel }}</span>{{ end }}
+              </div>
               <div class="ch-dow">{{ .Label }}</div>
             </a>
           {{ end }}

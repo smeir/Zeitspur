@@ -21,6 +21,14 @@
         {{ end }}
       </select>
     </label>
+    <fieldset class="weekday-settings">
+      <legend>{{ T "TodayWeekdays" }}</legend>
+      <div class="weekday-options">
+      {{ range .Weekdays }}
+        <label><input type="checkbox" name="today_weekdays" value="{{ .Value }}" {{ if .Selected }}checked{{ end }}> {{ .Label }}</label>
+      {{ end }}
+      </div>
+    </fieldset>
     <button type="submit">{{ T "Save" }}</button>
   </form>
   <p class="muted">{{ Tf "SettingsPersisted" (dict "Path" .ConfigPath) }}</p>

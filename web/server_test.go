@@ -7,6 +7,7 @@ import (
 	"net/http/httptest"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/smeir/zeitspur/internal/activity"
 	"github.com/smeir/zeitspur/internal/clock"
@@ -297,6 +298,50 @@ func TestServer_EnglishDayView(t *testing.T) {
 	}
 	if !strings.Contains(body, "Week 24") {
 		t.Errorf("expected English ISO week label, got body:\n%s", body)
+	}
+}
+
+func TestServer_TodayWeekChartUsesConfiguredWeekdays(t *testing.T) {
+	db, err := database.Open(t.TempDir() + "/test.db")
+	if err != nil {
+		t.Fatalf("open db: %v", err)
+	}
+	if err := database.Migrate(context.Background(), db); err != nil {
+		t.Fatalf("migrate: %v", err)
+	}
+	ctx := context.Background()
+	if _, err := db.ExecContext(ctx, `
+		INSERT INTO work_blocks (work_date, started_at, ended_at, source, status, created_at, updated_at)
+		VALUES
+		('2026-06-15', '2026-06-15T09:00:00Z', '2026-06-15T10:00:00Z', 'detected', 'active', '2026-06-15T09:00:00Z', '2026-06-15T09:00:00Z'),
+		('2026-06-16', '2026-06-16T09:00:00Z', '2026-06-16T11:00:00Z', 'detected', 'active', '2026-06-16T09:00:00Z', '2026-06-16T09:00:00Z')
+	`); err != nil {
+		t.Fatalf("insert blocks: %v", err)
+	}
+
+	cfg := config.Config{}
+	cfg.Server.ListenAddress = "127.0.0.1:8787"
+	cfg.App.Timezone = "UTC"
+	cfg.App.TodayWeekdays = []string{"mon", "wed", "fri"}
+	paths := config.Paths{ConfigFile: t.TempDir() + "/config.toml"}
+	provider := activity.NewMockProvider(activity.ActivityActive)
+	srv, err := NewServer(db, cfg, paths, provider, clock.NewFixed(time.Date(2026, 6, 17, 12, 0, 0, 0, time.UTC)), "test")
+	if err != nil {
+		t.Fatalf("new server: %v", err)
+	}
+
+	days, total, _, unbooked := srv.weekChart(ctx, time.Date(2026, 6, 17, 12, 0, 0, 0, time.UTC))
+	if len(days) != 3 {
+		t.Fatalf("expected 3 configured weekdays, got %d", len(days))
+	}
+	if days[0].Date != "2026-06-15" || days[1].Date != "2026-06-17" || days[2].Date != "2026-06-19" {
+		t.Fatalf("expected mon/wed/fri dates, got %+v", days)
+	}
+	if total != 60 {
+		t.Fatalf("expected total to include only configured weekdays, got %d", total)
+	}
+	if unbooked != 1 {
+		t.Fatalf("expected unbooked count to include only configured weekdays, got %d", unbooked)
 	}
 }
 

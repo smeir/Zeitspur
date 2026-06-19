@@ -33,7 +33,7 @@ flowchart LR
   web --> config
 ```
 
-The `zeitspur` binary has five subcommands: `serve`, `status`, `open`, `install`, and `uninstall`. `serve` is the runtime command used by the systemd user service. It starts the activity collection engine and the local HTTP server in the same process.
+The `zeitspur` binary has six subcommands: `serve`, `status`, `open`, `install`, `uninstall`, and `version`. `serve` is the runtime command used by the systemd user service. It starts the activity collection engine and the local HTTP server in the same process.
 
 Key principles:
 
@@ -139,7 +139,7 @@ sequenceDiagram
 
 | Provider | File | Behaviour |
 | --- | --- | --- |
-| GNOME/Mutter | `internal/activity/gnome_provider.go` | Queries `org.gnome.Mutter.IdleMonitor` for idle time and `org.gnome.desktop.screensaver` / `org.freedesktop.ScreenSaver` for lock state. |
+| GNOME/Mutter | `internal/activity/gnome_provider.go` | Queries `org.gnome.Mutter.IdleMonitor` for idle time and `org.gnome.ScreenSaver` (falling back to `org.freedesktop.ScreenSaver`) for lock state. |
 | Freedesktop | `internal/activity/freedesktop_provider.go` | Generic fallback that queries `org.freedesktop.ScreenSaver` and `org.kde.screensaver` for idle time and lock state, covering KDE and other freedesktop-compatible desktops. |
 | Mock | `internal/activity/mock.go` | Programmable state for tests and fallback when D-Bus is unavailable. |
 
@@ -356,6 +356,7 @@ Configuration is loaded from `~/.config/zeitspur/config.toml`:
 | `server` | `listen_address` | `127.0.0.1:8787` | Web UI bind address. |
 | `app` | `timezone` | `local` | `local` or an IANA timezone. |
 | `app` | `language` | `de` | UI language: `de` or `en`. |
+| `app` | `today_weekdays` | `["mon", "tue", "wed", "thu", "fri"]` | Days shown in the Today view week chart. |
 
 `internal/config/config.go` loads TOML via `github.com/BurntSushi/toml`, provides defaults, and validates values. `internal/systemd/systemd.go` installs a user unit that waits for `graphical-session.target`, runs the binary from `~/.local/bin/zeitspur`, and uses `NoNewPrivileges=true` and `PrivateTmp=true`.
 

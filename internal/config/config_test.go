@@ -25,6 +25,7 @@ func TestLoad_EmptyPathReturnsDefaults(t *testing.T) {
 	if cfg.App.Timezone != DefaultTimezone {
 		t.Fatalf("expected default timezone %q, got %q", DefaultTimezone, cfg.App.Timezone)
 	}
+	assertWeekdays(t, cfg.TodayWeekdays(), []time.Weekday{time.Monday, time.Tuesday, time.Wednesday, time.Thursday, time.Friday})
 }
 
 func TestLoad_MissingFileReturnsDefaults(t *testing.T) {
@@ -49,6 +50,7 @@ listen_address = "127.0.0.1:9999"
 
 [app]
 timezone = "UTC"
+today_weekdays = ["mon", "wed", "fri"]
 `
 	if err := os.WriteFile(path, []byte(content), 0o600); err != nil {
 		t.Fatalf("write config: %v", err)
@@ -70,6 +72,7 @@ timezone = "UTC"
 	if cfg.App.Timezone != "UTC" {
 		t.Fatalf("expected timezone UTC, got %q", cfg.App.Timezone)
 	}
+	assertWeekdays(t, cfg.TodayWeekdays(), []time.Weekday{time.Monday, time.Wednesday, time.Friday})
 }
 
 func TestWriteAndLoadRoundTrip(t *testing.T) {
@@ -80,7 +83,7 @@ func TestWriteAndLoadRoundTrip(t *testing.T) {
 			IdleThreshold: "90s",
 		},
 		Server: ServerConfig{ListenAddress: "127.0.0.1:1234"},
-		App:    AppConfig{Timezone: "Europe/Berlin"},
+		App:    AppConfig{Timezone: "Europe/Berlin", TodayWeekdays: []string{"mon", "tue", "wed"}},
 	}
 
 	if err := Write(path, cfg); err != nil {
@@ -103,6 +106,7 @@ func TestWriteAndLoadRoundTrip(t *testing.T) {
 	if loaded.App.Timezone != cfg.App.Timezone {
 		t.Fatalf("expected timezone %q, got %q", cfg.App.Timezone, loaded.App.Timezone)
 	}
+	assertWeekdays(t, loaded.TodayWeekdays(), []time.Weekday{time.Monday, time.Tuesday, time.Wednesday})
 }
 
 func TestValidate_DefaultsValid(t *testing.T) {
@@ -120,6 +124,28 @@ func TestValidate_InvalidTimezone(t *testing.T) {
 	cfg.App.Timezone = "Mars/Phobos"
 	if err := cfg.Validate(); err == nil || !strings.Contains(err.Error(), "timezone") {
 		t.Fatalf("expected invalid timezone error, got %v", err)
+	}
+}
+
+func TestValidate_InvalidTodayWeekdays(t *testing.T) {
+	tests := []struct {
+		name     string
+		weekdays []string
+		errSub   string
+	}{
+		{name: "empty", weekdays: []string{}, errSub: "today_weekdays"},
+		{name: "unknown", weekdays: []string{"mon", "monday"}, errSub: "monday"},
+		{name: "duplicate", weekdays: []string{"mon", "mon"}, errSub: "duplicate"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			cfg, _ := Load("")
+			cfg.App.TodayWeekdays = tt.weekdays
+			if err := cfg.Validate(); err == nil || !strings.Contains(err.Error(), tt.errSub) {
+				t.Fatalf("expected error containing %q, got %v", tt.errSub, err)
+			}
+		})
 	}
 }
 
@@ -174,5 +200,17 @@ func TestDefaultPaths(t *testing.T) {
 	}
 	if !strings.Contains(paths.DataDir, AppName) {
 		t.Fatalf("expected data dir to contain %q, got %q", AppName, paths.DataDir)
+	}
+}
+
+func assertWeekdays(t *testing.T, got, want []time.Weekday) {
+	t.Helper()
+	if len(got) != len(want) {
+		t.Fatalf("expected weekdays %v, got %v", want, got)
+	}
+	for i := range want {
+		if got[i] != want[i] {
+			t.Fatalf("expected weekdays %v, got %v", want, got)
+		}
 	}
 }
