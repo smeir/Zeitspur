@@ -5,7 +5,7 @@
   <p>{{ T "Period" }}: {{ dateShort .PeriodStart }} - {{ dateShort .PeriodEnd }}</p>
   <p>{{ T "TrackedWorkdays" }}: {{ .Tracked }}</p>
   <p>{{ T "Booked" }}: {{ .Booked }} &middot; {{ T "Unbooked" }}: {{ .Unbooked }}</p>
-  <p>{{ T "TotalMinutes" }}: {{ .TotalMinutes }}</p>
+  <p>{{ T "TotalDuration" }}: {{ formatMinutes .TotalMinutes }}</p>
   {{if .HasUnbookedWarning}}<p class="changed">{{ Tf "UnbookedDaysWarning" (dict "Count" .UnbookedCount) }}</p>{{end}}
   <form action="/booking/close" method="post">
     <input type="hidden" name="csrf_token" value="{{.CSRFToken}}">

@@ -6,7 +6,7 @@
   <p>{{ T "ClosedAt" }}: {{ dateTime .Closure.ClosedAt }}</p>
   <p>{{ T "TrackedWorkdays" }}: {{ .Closure.TrackedWorkdayCount }}</p>
   <p>{{ T "Booked" }}: {{ .Closure.BookedWorkdayCount }} &middot; {{ T "Unbooked" }}: {{ .Closure.UnbookedWorkdayCount }}</p>
-  <p>{{ T "TotalMinutes" }}: {{ .Closure.TrackedMinutesSnapshot }}</p>
+  <p>{{ T "TotalDuration" }}: {{ formatMinutes .Closure.TrackedMinutesSnapshot }}</p>
   {{ if .Differs }}
     <p class="changed">{{ T "CurrentDataDiffers" }}</p>
   {{ end }}
@@ -16,14 +16,14 @@
   <h3>{{ T "DaySnapshot" }}</h3>
   <table>
     <thead>
-      <tr><th>{{ T "Date" }}</th><th>{{ T "Booked" }}</th><th>{{ T "TrackedMinutes" }}</th></tr>
+      <tr><th>{{ T "Date" }}</th><th>{{ T "Booked" }}</th><th>{{ T "TrackedDuration" }}</th></tr>
     </thead>
     <tbody>
     {{ range .Closure.Days }}
       <tr>
         <td>{{ dateShort .DateObj }}</td>
         <td>{{ yesNo .BookedSnapshot }}</td>
-        <td>{{ .TrackedMinutes }}</td>
+        <td>{{ formatMinutes .TrackedMinutes }}</td>
       </tr>
     {{ end }}
     </tbody>

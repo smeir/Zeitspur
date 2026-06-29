@@ -150,8 +150,7 @@ a {
   font-weight: 600;
 }
 
-.live .dot,
-.hero-status .dot {
+.live .dot {
   width: 8px;
   height: 8px;
   border-radius: 50%;
@@ -256,31 +255,6 @@ main {
   opacity: 0.85;
 }
 
-.hero-status {
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  padding: 7px 14px;
-  border-radius: 999px;
-  background: rgba(255, 255, 255, 0.18);
-  font-size: 0.85rem;
-  font-weight: 600;
-  white-space: nowrap;
-}
-
-.hero-status .dot {
-  background: #6ee7b7;
-  box-shadow: 0 0 0 4px rgba(110, 231, 183, 0.3);
-}
-
-.hero-status-idle .dot,
-.hero-status-locked .dot,
-.hero-status-suspended .dot,
-.hero-status-unknown .dot {
-  background: #fcd34d;
-  box-shadow: 0 0 0 4px rgba(252, 211, 77, 0.25);
-}
-
 .hero-stats {
   position: relative;
   display: grid;
@@ -315,12 +289,6 @@ main {
 
 .hs-booking {
   font-size: 1.15rem;
-}
-
-.hs-sub {
-  margin-top: 1px;
-  font-size: 0.74rem;
-  opacity: 0.75;
 }
 
 .card {

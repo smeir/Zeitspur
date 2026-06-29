@@ -395,10 +395,6 @@ func (s *Server) addTodayViewData(ctx context.Context, data map[string]any, date
 		})
 	}
 
-	openBlocks := 0
-	if running != nil {
-		openBlocks = 1
-	}
 	totalBlocks := activeBlocks
 	if extraRunningBlock {
 		totalBlocks++
@@ -416,7 +412,6 @@ func (s *Server) addTodayViewData(ctx context.Context, data map[string]any, date
 	data["NowPercent"] = nowPercent
 	data["TimelineBlocks"] = timelineBlocks
 	data["ActiveBlockCount"] = totalBlocks
-	data["OpenBlockCount"] = openBlocks
 	data["DayProgressPercent"] = progressPercent(sum.WorkedMinutes, dailyTargetMinutes)
 	data["DayTargetMinutes"] = dailyTargetMinutes
 	data["DayRemainingMinutes"] = max(0, dailyTargetMinutes-sum.WorkedMinutes)

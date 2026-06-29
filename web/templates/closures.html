@@ -4,7 +4,7 @@
   {{ if .Closures }}
   <table>
     <thead>
-      <tr><th>{{ T "Period" }}</th><th>{{ T "BookingDay" }}</th><th>{{ T "Closed" }}</th><th>{{ T "Days" }}</th><th>{{ T "Booked" }}</th><th>{{ T "Unbooked" }}</th><th>{{ T "Minutes" }}</th><th>{{ T "Differs" }}</th></tr>
+      <tr><th>{{ T "Period" }}</th><th>{{ T "BookingDay" }}</th><th>{{ T "Closed" }}</th><th>{{ T "Days" }}</th><th>{{ T "Booked" }}</th><th>{{ T "Unbooked" }}</th><th>{{ T "Duration" }}</th><th>{{ T "Differs" }}</th></tr>
     </thead>
     <tbody>
     {{ range .Closures }}
@@ -15,7 +15,7 @@
         <td>{{ .TrackedWorkdayCount }}</td>
         <td>{{ .BookedWorkdayCount }}</td>
         <td>{{ .UnbookedWorkdayCount }}</td>
-        <td>{{ .TrackedMinutesSnapshot }}</td>
+        <td>{{ formatMinutes .TrackedMinutesSnapshot }}</td>
         <td>{{ yesNo .Differs }}</td>
       </tr>
     {{ end }}

@@ -345,6 +345,50 @@ func TestServer_TodayWeekChartUsesConfiguredWeekdays(t *testing.T) {
 	}
 }
 
+func TestServer_ClosurePagesFormatDurations(t *testing.T) {
+	srv, db := newTestServer(t)
+	ctx := context.Background()
+	if _, err := db.ExecContext(ctx, `
+		INSERT INTO booking_closures
+			(period_start, period_end, booking_day, closed_at, tracked_workday_count, booked_workday_count, unbooked_workday_count, tracked_minutes_snapshot)
+		VALUES
+			('2026-06-12', '2026-06-13', '2026-06-13', '2026-06-13T17:00:00Z', 2, 1, 1, 150)
+	`); err != nil {
+		t.Fatalf("insert closure: %v", err)
+	}
+	if _, err := db.ExecContext(ctx, `
+		INSERT INTO booking_closure_days
+			(closure_id, work_date, booked_snapshot, tracked_minutes_snapshot, day_revision_snapshot)
+		VALUES
+			(1, '2026-06-12', 1, 90, 1),
+			(1, '2026-06-13', 0, 60, 1)
+	`); err != nil {
+		t.Fatalf("insert closure days: %v", err)
+	}
+
+	assertClosureDuration := func(path string, want ...string) {
+		t.Helper()
+		req := httptest.NewRequest(http.MethodGet, path, nil)
+		rr := httptest.NewRecorder()
+		srv.ServeHTTP(rr, req)
+		if rr.Code != http.StatusOK {
+			t.Fatalf("expected 200 for %s, got %d", path, rr.Code)
+		}
+		body := rr.Body.String()
+		for _, value := range want {
+			if !strings.Contains(body, value) {
+				t.Errorf("expected %s to contain %q, got body:\n%s", path, value, body)
+			}
+		}
+		if strings.Contains(body, ">150<") || strings.Contains(body, ">90<") || strings.Contains(body, ">60<") {
+			t.Errorf("expected %s to avoid raw minute values, got body:\n%s", path, body)
+		}
+	}
+
+	assertClosureDuration("/closures", "2h 30m")
+	assertClosureDuration("/closures/1", "2h 30m", "1h 30m", "1h 0m")
+}
+
 func TestServer_DayViewReflectsInactiveActivityStatus(t *testing.T) {
 	srv, _ := newTestServer(t)
 	srv.provider.(*activity.MockProvider).SetState(activity.ActivityIdle)
@@ -358,9 +402,6 @@ func TestServer_DayViewReflectsInactiveActivityStatus(t *testing.T) {
 	body := rr.Body.String()
 	if !strings.Contains(body, `class="live live-idle"`) {
 		t.Errorf("expected header to render idle status, got body:\n%s", body)
-	}
-	if !strings.Contains(body, `class="hero-status hero-status-idle"`) {
-		t.Errorf("expected today status card to render idle status, got body:\n%s", body)
 	}
 	if strings.Contains(body, "System aktiv") {
 		t.Errorf("did not expect fixed active label in idle day view")

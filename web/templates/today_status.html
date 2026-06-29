@@ -5,28 +5,23 @@
       <h1>{{ .TodayHeadline }}</h1>
       <div class="date">{{ .TodaySubline }}</div>
     </div>
-    <span class="hero-status hero-status-{{ .ActivityStatus }}"><span class="dot"></span>{{ statusLabel .ActivityStatus }}</span>
   </div>
   <div class="hero-stats">
     <div class="hs">
       <div class="hs-label">{{ T "Worked" }}</div>
       <div class="hs-value">{{ formatMinutes .WorkedMinutes }}</div>
-      <div class="hs-sub">{{ T "TargetEightHours" }}</div>
     </div>
     <div class="hs">
       <div class="hs-label">{{ T "Pause" }}</div>
       <div class="hs-value">{{ formatMinutes .PauseMinutes }}</div>
-      <div class="hs-sub">{{ T "CapturedAutomatically" }}</div>
     </div>
     <div class="hs">
       <div class="hs-label">{{ T "Blocks" }}</div>
       <div class="hs-value">{{ .ActiveBlockCount }}</div>
-      <div class="hs-sub">{{ Tf "OpenBlocks" (dict "Count" .OpenBlockCount) }}</div>
     </div>
     <div class="hs">
       <div class="hs-label">{{ T "Booking" }}</div>
       <div class="hs-value hs-booking">{{ bookedLabel .Booked }}</div>
-      <div class="hs-sub">{{ T "LocalOnly" }}</div>
     </div>
   </div>
 </section>

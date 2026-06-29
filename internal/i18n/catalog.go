@@ -74,9 +74,6 @@ func NewCatalog() Catalog {
 			"Cancel":                 "Abbrechen",
 			"SystemActive":           "System aktiv",
 			"TargetEightHours":       "Ziel 8h",
-			"CapturedAutomatically":  "automatisch erfasst",
-			"OpenBlocks":             "{{.Count}} offen",
-			"LocalOnly":              "lokal gespeichert",
 			"DailyTimeline":          "Tagesverlauf",
 			"Running":                "Laufend",
 			"Now":                    "Jetzt",
@@ -136,13 +133,12 @@ func NewCatalog() Catalog {
 			"Closed":             "Abgeschlossen",
 			"Days":               "Tage",
 			"Unbooked":           "Ungebucht",
-			"Minutes":            "Minuten",
 			"Differs":            "Abweichend",
 
 			// Close preview
 			"ClosePeriodPreview":  "Abschlussvorschau",
 			"TrackedWorkdays":     "Erfasste Arbeitstage",
-			"TotalMinutes":        "Gesamtminuten",
+			"TotalDuration":       "Gesamtdauer",
 			"UnbookedDaysWarning": "Achtung: {{.Count}} ungebuchte Tage.",
 			"AcknowledgeUnbooked": "Ich bestätige, dass ungebuchte Tage verbleiben.",
 			"CloseBookingPeriod":  "Buchungsperiode abschließen",
@@ -152,7 +148,7 @@ func NewCatalog() Catalog {
 			"ClosedAt":           "Abgeschlossen am",
 			"CurrentDataDiffers": "Aktuelle Daten weichen von diesem Snapshot ab.",
 			"DaySnapshot":        "Tages-Snapshot",
-			"TrackedMinutes":     "Erfasste Minuten",
+			"TrackedDuration":    "Erfasste Dauer",
 
 			// Settings
 			"Settings":          "Einstellungen",
@@ -215,9 +211,6 @@ func NewCatalog() Catalog {
 			"Cancel":                 "Cancel",
 			"SystemActive":           "System active",
 			"TargetEightHours":       "Target 8h",
-			"CapturedAutomatically":  "captured automatically",
-			"OpenBlocks":             "{{.Count}} open",
-			"LocalOnly":              "stored locally",
 			"DailyTimeline":          "Daily timeline",
 			"Running":                "Running",
 			"Now":                    "Now",
@@ -278,13 +271,12 @@ func NewCatalog() Catalog {
 			"Closed":             "Closed",
 			"Days":               "Days",
 			"Unbooked":           "Unbooked",
-			"Minutes":            "Minutes",
 			"Differs":            "Differs",
 
 			// Close preview
 			"ClosePeriodPreview":  "Close Period Preview",
 			"TrackedWorkdays":     "Tracked workdays",
-			"TotalMinutes":        "Total minutes",
+			"TotalDuration":       "Total duration",
 			"UnbookedDaysWarning": "Warning: {{.Count}} unbooked days.",
 			"AcknowledgeUnbooked": "I acknowledge that unbooked days remain.",
 			"CloseBookingPeriod":  "Close booking period",
@@ -294,7 +286,7 @@ func NewCatalog() Catalog {
 			"ClosedAt":           "Closed at",
 			"CurrentDataDiffers": "Current data differs from this snapshot.",
 			"DaySnapshot":        "Day snapshot",
-			"TrackedMinutes":     "Tracked minutes",
+			"TrackedDuration":    "Tracked duration",
 
 			// Settings
 			"Settings":          "Settings",
