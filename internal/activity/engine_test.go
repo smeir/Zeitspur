@@ -85,7 +85,7 @@ func TestEngine_ScreenLockEndsBlock(t *testing.T) {
 	}
 }
 
-func TestEngine_ShortIdleGapKeepsBlock(t *testing.T) {
+func TestEngine_IdleEventTimestamp(t *testing.T) {
 	db := newTestDB(t)
 	defer db.Close()
 
@@ -97,14 +97,19 @@ func TestEngine_ShortIdleGapKeepsBlock(t *testing.T) {
 	ctx := context.Background()
 	eng.Process(ctx)
 
-	clk.Set(start.Add(1 * time.Minute))
+	clk.Set(start.Add(2 * time.Minute))
 	mock.SetState(ActivityIdle)
 	eng.Process(ctx)
 
-	// No idle event should be written yet.
-	types := eventTypes(t, db)
-	if len(types) != 1 {
-		t.Fatalf("expected 1 event, got %d: %v", len(types), types)
+	var ts string
+	err := db.QueryRow("SELECT occurred_at FROM activity_events WHERE event_type = 'idle'").Scan(&ts)
+	if err != nil {
+		t.Fatalf("expected idle event, got %v", err)
+	}
+
+	expected := start.Add(-1 * time.Minute).Format(time.RFC3339Nano)
+	if ts != expected {
+		t.Errorf("expected idle at %v, got %v", expected, ts)
 	}
 }
 

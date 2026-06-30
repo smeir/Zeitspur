@@ -156,14 +156,14 @@ func (e *Engine) tick(ctx context.Context) error {
 		e.reconcileCurrentDay(ctx, now)
 	case ActivityIdle:
 		if e.lastState == ActivityActive || e.lastState == ActivityUnknown {
-			if now.Sub(e.lastActiveAt) >= e.idleThreshold {
-				pauseStart := e.lastActiveAt.Add(e.idleThreshold)
-				if err := e.insertEventAt(ctx, EventIdle, pauseStart, nil); err != nil {
-					return err
-				}
-				e.reconcileCurrentDay(ctx, pauseStart)
-				e.lastState = ActivityIdle
+			// The provider already enforces idleThreshold. If it returns ActivityIdle,
+			// the user has been idle for exactly idleThreshold.
+			pauseStart := now.Add(-e.idleThreshold)
+			if err := e.insertEventAt(ctx, EventIdle, pauseStart, nil); err != nil {
+				return err
 			}
+			e.reconcileCurrentDay(ctx, pauseStart)
+			e.lastState = ActivityIdle
 		}
 	case ActivityLocked:
 		if e.lastState != ActivityLocked {
