@@ -57,7 +57,7 @@ func (c *logindChecker) isLocked(ctx context.Context) (bool, error) {
 	if err != nil {
 		return false, err
 	}
-	
+
 	if locked, ok := v.Value().(bool); ok {
 		return locked, nil
 	}
