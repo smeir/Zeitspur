@@ -14,6 +14,7 @@ import (
 // including KDE (org.kde.screensaver).
 type FreedesktopProvider struct {
 	conn          *dbus.Conn
+	logind        *logindChecker
 	idleThreshold time.Duration
 	name          string
 	services      []string
@@ -39,8 +40,10 @@ func newFreedesktopProvider(name string, services []string, idleThreshold time.D
 	if err != nil {
 		return nil, fmt.Errorf("connect session bus: %w", err)
 	}
+	logind, _ := newLogindChecker()
 	p := &FreedesktopProvider{
 		conn:          conn,
+		logind:        logind,
 		idleThreshold: idleThreshold,
 		name:          name,
 		services:      services,
@@ -85,18 +88,13 @@ func (f *FreedesktopProvider) CurrentState(ctx context.Context) (ActivityState, 
 }
 
 func (f *FreedesktopProvider) defaultLocked(ctx context.Context) (bool, error) {
-	paths := []dbus.ObjectPath{"/ScreenSaver", "/org/freedesktop/ScreenSaver"}
-	for _, svc := range f.services {
-		for _, p := range paths {
-			obj := f.conn.Object(svc, p)
-			var active bool
-			err := obj.CallWithContext(ctx, "org.freedesktop.ScreenSaver.GetActive", 0).Store(&active)
-			if err == nil {
-				return active, nil
-			}
+	if f.logind != nil {
+		locked, err := f.logind.isLocked(ctx)
+		if err == nil {
+			return locked, nil
 		}
 	}
-	return false, errors.New("no screensaver service available")
+	return false, errors.New("no lockscreen service available")
 }
 
 // defaultIdleTime returns the session idle time in seconds.
@@ -117,6 +115,9 @@ func (f *FreedesktopProvider) defaultIdleTime(ctx context.Context) (uint32, erro
 
 // Close closes the D-Bus connection.
 func (f *FreedesktopProvider) Close() error {
+	if f.logind != nil {
+		f.logind.Close()
+	}
 	if f.conn != nil {
 		return f.conn.Close()
 	}

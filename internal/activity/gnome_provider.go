@@ -16,6 +16,7 @@ const dbusProbeTimeout = 2 * time.Second
 // GNOMEProvider queries GNOME/Mutter over D-Bus for idle and lock state.
 type GNOMEProvider struct {
 	conn          *dbus.Conn
+	logind        *logindChecker
 	idleThreshold time.Duration
 }
 
@@ -31,7 +32,8 @@ func NewGNOMEProvider(idleThreshold time.Duration) (*GNOMEProvider, error) {
 	if err != nil {
 		return nil, fmt.Errorf("connect session bus: %w", err)
 	}
-	p := &GNOMEProvider{conn: conn, idleThreshold: idleThreshold}
+	logind, _ := newLogindChecker()
+	p := &GNOMEProvider{conn: conn, logind: logind, idleThreshold: idleThreshold}
 
 	ctx, cancel := context.WithTimeout(context.Background(), dbusProbeTimeout)
 	defer cancel()
@@ -70,17 +72,13 @@ func (g *GNOMEProvider) CurrentState(ctx context.Context) (ActivityState, error)
 }
 
 func (g *GNOMEProvider) isLocked(ctx context.Context) (bool, error) {
-	obj := g.conn.Object("org.gnome.ScreenSaver", "/org/gnome/ScreenSaver")
-	var locked bool
-	err := obj.CallWithContext(ctx, "org.gnome.ScreenSaver.GetActive", 0).Store(&locked)
-	if err == nil {
-		return locked, nil
+	if g.logind != nil {
+		locked, err := g.logind.isLocked(ctx)
+		if err == nil {
+			return locked, nil
+		}
 	}
-
-	// Fallback to freedesktop screensaver.
-	obj = g.conn.Object("org.freedesktop.ScreenSaver", "/org/freedesktop/ScreenSaver")
-	err = obj.CallWithContext(ctx, "org.freedesktop.ScreenSaver.GetActive", 0).Store(&locked)
-	return locked, err
+	return false, errors.New("no lockscreen service available")
 }
 
 func (g *GNOMEProvider) idleTime(ctx context.Context) (uint64, error) {
@@ -92,6 +90,9 @@ func (g *GNOMEProvider) idleTime(ctx context.Context) (uint64, error) {
 
 // Close closes the D-Bus connection.
 func (g *GNOMEProvider) Close() error {
+	if g.logind != nil {
+		g.logind.Close()
+	}
 	if g.conn != nil {
 		return g.conn.Close()
 	}
