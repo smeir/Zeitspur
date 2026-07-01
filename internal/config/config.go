@@ -16,9 +16,17 @@ const (
 
 	DefaultPollInterval  = 5 * time.Second
 	DefaultIdleThreshold = 5 * time.Minute
+	DefaultActivityMode  = ActivityModeIdleAndLock
 	DefaultListenAddress = "127.0.0.1:8787"
 	DefaultTimezone      = "local"
 	DefaultLanguage      = "de"
+)
+
+const (
+	// ActivityModeIdleAndLock tracks pauses from idle, lock, and suspend signals.
+	ActivityModeIdleAndLock = "idle_and_lock"
+	// ActivityModeLockOnly tracks pauses from screen lock and suspend signals only.
+	ActivityModeLockOnly = "lock_only"
 )
 
 var defaultTodayWeekdays = []string{"mon", "tue", "wed", "thu", "fri"}
@@ -53,6 +61,7 @@ type Config struct {
 type ActivityConfig struct {
 	PollInterval  string `toml:"poll_interval"`
 	IdleThreshold string `toml:"idle_threshold"`
+	Mode          string `toml:"mode"`
 }
 
 // ServerConfig holds HTTP server settings.
@@ -73,6 +82,14 @@ func (c Config) PollInterval() time.Duration {
 }
 func (c Config) IdleThreshold() time.Duration {
 	return parseDuration(c.Activity.IdleThreshold, DefaultIdleThreshold)
+}
+
+// ActivityMode returns the configured pause tracking mode.
+func (c Config) ActivityMode() string {
+	if c.Activity.Mode == "" {
+		return DefaultActivityMode
+	}
+	return strings.ToLower(strings.TrimSpace(c.Activity.Mode))
 }
 
 // TodayWeekdays returns the weekdays shown in the Today view week chart.
@@ -131,6 +148,7 @@ func Load(path string) (Config, error) {
 		Activity: ActivityConfig{
 			PollInterval:  DefaultPollInterval.String(),
 			IdleThreshold: DefaultIdleThreshold.String(),
+			Mode:          DefaultActivityMode,
 		},
 		Server: ServerConfig{
 			ListenAddress: DefaultListenAddress,
@@ -194,6 +212,13 @@ func (c Config) Validate() error {
 	}
 	if c.IdleThreshold() <= 0 {
 		return fmt.Errorf("idle_threshold must be positive")
+	}
+	switch c.ActivityMode() {
+	case ActivityModeIdleAndLock, ActivityModeLockOnly:
+	case "":
+		return fmt.Errorf("activity mode must not be empty")
+	default:
+		return fmt.Errorf("invalid activity mode %q: must be %q or %q", c.Activity.Mode, ActivityModeIdleAndLock, ActivityModeLockOnly)
 	}
 	if c.Server.ListenAddress == "" {
 		return fmt.Errorf("listen_address must not be empty")

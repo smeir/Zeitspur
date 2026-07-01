@@ -929,6 +929,7 @@ func (s *Server) handleSettingsSave(w http.ResponseWriter, r *http.Request) {
 	cfg := s.config()
 	cfg.Activity.PollInterval = r.FormValue("poll_interval")
 	cfg.Activity.IdleThreshold = r.FormValue("idle_threshold")
+	cfg.Activity.Mode = r.FormValue("activity_mode")
 	cfg.Server.ListenAddress = r.FormValue("listen_address")
 	cfg.App.Timezone = r.FormValue("timezone")
 	cfg.App.Language = r.FormValue("language")

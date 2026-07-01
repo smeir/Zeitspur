@@ -2,6 +2,7 @@
 # Copy to ~/.config/zeitspur/config.toml and adjust as needed.
 
 [activity]
+mode = "idle_and_lock" # "idle_and_lock" or "lock_only". Suspend always counts as a pause.
 poll_interval = "5s"
 idle_threshold = "5m"
 

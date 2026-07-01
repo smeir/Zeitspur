@@ -73,6 +73,7 @@ func printUsage() {
 
 type autoProvider struct {
 	idleThreshold time.Duration
+	activityMode  string
 	current       activity.ActivityProvider
 }
 
@@ -86,12 +87,16 @@ func (a *autoProvider) Name() string {
 func (a *autoProvider) CurrentState(ctx context.Context) (activity.ActivityState, error) {
 	if a.current == nil {
 		var err error
-		a.current, err = activity.NewGNOMEProvider(a.idleThreshold)
-		if err != nil {
-			a.current, err = activity.NewFreedesktopProvider(a.idleThreshold)
+		if a.activityMode == config.ActivityModeLockOnly {
+			a.current, err = activity.NewLockOnlyProvider()
+		} else {
+			a.current, err = activity.NewGNOMEProvider(a.idleThreshold)
+			if err != nil {
+				a.current, err = activity.NewFreedesktopProvider(a.idleThreshold)
+			}
 		}
 		if err != nil {
-			return activity.ActivityUnknown, fmt.Errorf("no d-bus provider available: %w", err)
+			return activity.ActivityUnknown, fmt.Errorf("no activity provider available: %w", err)
 		}
 	}
 
@@ -139,7 +144,7 @@ func setup() (config.Config, config.Paths, *sql.DB, activity.ActivityProvider, e
 		return config.Config{}, config.Paths{}, nil, nil, err
 	}
 
-	provider := &autoProvider{idleThreshold: cfg.IdleThreshold()}
+	provider := &autoProvider{idleThreshold: cfg.IdleThreshold(), activityMode: cfg.ActivityMode()}
 
 	return cfg, paths, db, provider, nil
 }

@@ -149,6 +149,7 @@ Available settings:
 
 ```toml
 [activity]
+mode = "idle_and_lock" # "idle_and_lock" or "lock_only"; suspend always counts as a pause
 poll_interval = "5s"
 idle_threshold = "5m"
 
@@ -161,7 +162,9 @@ language = "de"    # "de" or "en"
 today_weekdays = ["mon", "tue", "wed", "thu", "fri"] # Today view week chart days
 ```
 
-Changes to `listen_address` and `timezone` require a service restart to take full effect.
+`idle_and_lock` tracks pauses from idle time, screen lock, and suspend. `lock_only` ignores idle time and tracks pauses only from screen lock and suspend.
+
+Changes to `listen_address`, `timezone`, and `activity.mode` require a service restart to take full effect.
 
 ## Data location
 

@@ -19,6 +19,9 @@ func TestLoad_EmptyPathReturnsDefaults(t *testing.T) {
 	if cfg.IdleThreshold() != DefaultIdleThreshold {
 		t.Fatalf("expected default idle threshold %v, got %v", DefaultIdleThreshold, cfg.IdleThreshold())
 	}
+	if cfg.ActivityMode() != DefaultActivityMode {
+		t.Fatalf("expected default activity mode %q, got %q", DefaultActivityMode, cfg.ActivityMode())
+	}
 	if cfg.Server.ListenAddress != DefaultListenAddress {
 		t.Fatalf("expected default listen address %q, got %q", DefaultListenAddress, cfg.Server.ListenAddress)
 	}
@@ -44,6 +47,7 @@ func TestLoad_ValidFile(t *testing.T) {
 [activity]
 poll_interval = "10s"
 idle_threshold = "2m"
+mode = "lock_only"
 
 [server]
 listen_address = "127.0.0.1:9999"
@@ -66,6 +70,9 @@ today_weekdays = ["mon", "wed", "fri"]
 	if cfg.IdleThreshold() != 2*time.Minute {
 		t.Fatalf("expected idle threshold 2m, got %v", cfg.IdleThreshold())
 	}
+	if cfg.ActivityMode() != ActivityModeLockOnly {
+		t.Fatalf("expected activity mode %q, got %q", ActivityModeLockOnly, cfg.ActivityMode())
+	}
 	if cfg.Server.ListenAddress != "127.0.0.1:9999" {
 		t.Fatalf("expected listen address 127.0.0.1:9999, got %q", cfg.Server.ListenAddress)
 	}
@@ -81,6 +88,7 @@ func TestWriteAndLoadRoundTrip(t *testing.T) {
 		Activity: ActivityConfig{
 			PollInterval:  "7s",
 			IdleThreshold: "90s",
+			Mode:          ActivityModeLockOnly,
 		},
 		Server: ServerConfig{ListenAddress: "127.0.0.1:1234"},
 		App:    AppConfig{Timezone: "Europe/Berlin", TodayWeekdays: []string{"mon", "tue", "wed"}},
@@ -99,6 +107,9 @@ func TestWriteAndLoadRoundTrip(t *testing.T) {
 	}
 	if loaded.IdleThreshold() != cfg.IdleThreshold() {
 		t.Fatalf("expected idle threshold %v, got %v", cfg.IdleThreshold(), loaded.IdleThreshold())
+	}
+	if loaded.ActivityMode() != cfg.ActivityMode() {
+		t.Fatalf("expected activity mode %q, got %q", cfg.ActivityMode(), loaded.ActivityMode())
 	}
 	if loaded.Server.ListenAddress != cfg.Server.ListenAddress {
 		t.Fatalf("expected listen address %q, got %q", cfg.Server.ListenAddress, loaded.Server.ListenAddress)
@@ -168,6 +179,13 @@ func TestValidate_InvalidDurations(t *testing.T) {
 				c.Activity.IdleThreshold = "-1m"
 			},
 			errSub: "idle_threshold",
+		},
+		{
+			name: "invalid activity mode",
+			setup: func(c *Config) {
+				c.Activity.Mode = "idle_only"
+			},
+			errSub: "activity mode",
 		},
 		{
 			name: "empty listen address",

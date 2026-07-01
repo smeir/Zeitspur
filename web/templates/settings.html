@@ -3,8 +3,15 @@
   <h2>{{ T "Settings" }}</h2>
   <form action="/settings" method="post">
     <input type="hidden" name="csrf_token" value="{{ .CSRFToken }}">
+    <label>{{ T "ActivityMode" }}
+      <select name="activity_mode">
+        <option value="idle_and_lock" {{ if eq .Config.Activity.Mode "idle_and_lock" }}selected{{ end }}>{{ T "ActivityModeIdleAndLock" }}</option>
+        <option value="lock_only" {{ if eq .Config.Activity.Mode "lock_only" }}selected{{ end }}>{{ T "ActivityModeLockOnly" }}</option>
+      </select>
+    </label>
     <label>{{ T "PollInterval" }} <input type="text" name="poll_interval" value="{{ .Config.Activity.PollInterval }}"></label>
     <label>{{ T "IdleThreshold" }} <input type="text" name="idle_threshold" value="{{ .Config.Activity.IdleThreshold }}"></label>
+    <p class="muted">{{ T "IdleThresholdModeNote" }}</p>
     <label>{{ T "ListenAddress" }} <input type="text" name="listen_address" value="{{ .Config.Server.ListenAddress }}"></label>
     <label>{{ T "Timezone" }}
       <select name="timezone">

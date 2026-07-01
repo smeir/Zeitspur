@@ -141,14 +141,15 @@ sequenceDiagram
 | --- | --- | --- |
 | GNOME/Mutter | `internal/activity/gnome_provider.go` | Queries `org.gnome.Mutter.IdleMonitor` for idle time and `org.gnome.ScreenSaver` (falling back to `org.freedesktop.ScreenSaver`) for lock state. |
 | Freedesktop | `internal/activity/freedesktop_provider.go` | Generic fallback that queries `org.freedesktop.ScreenSaver` and `org.kde.screensaver` for idle time and lock state, covering KDE and other freedesktop-compatible desktops. |
+| Lock only | `internal/activity/lock_only_provider.go` | Uses logind lock state only. It reports unlocked sessions as active, so idle time is ignored while screen lock and suspend still end work blocks. |
 | Mock | `internal/activity/mock.go` | Programmable state for tests and fallback when D-Bus is unavailable. |
 
-At startup the CLI tries providers in the order GNOME → Freedesktop → Mock, so KDE and other freedesktop-compatible desktops are used automatically when the GNOME-specific interfaces are not present.
+At startup the CLI chooses providers based on `activity.mode`. In `idle_and_lock` mode it tries GNOME → Freedesktop, so KDE and other freedesktop-compatible desktops are used automatically when the GNOME-specific interfaces are not present. In `lock_only` mode it uses the lock-only provider.
 
 The engine (`internal/activity/engine.go`) runs a ticker at `poll_interval`. On each tick it asks the provider for the current state and records an event only when the state changes:
 
 - `active` is emitted whenever the user becomes active after `idle`, `locked`, or `suspended`.
-- `idle` is emitted once `idle_threshold` has passed since the last activity; the timestamp is back-dated to the real idle start.
+- `idle` is emitted once `idle_threshold` has passed since the last activity in `idle_and_lock` mode; the timestamp is back-dated to the real idle start. `lock_only` mode does not emit idle events.
 - `locked` / `unlocked` and `suspend` / `resume` map directly to lock and power events.
 - `provider_error` is recorded once per consecutive failure with error metadata.
 
@@ -351,6 +352,7 @@ Configuration is loaded from `~/.config/zeitspur/config.toml`:
 
 | Section | Key | Default | Purpose |
 | --- | --- | --- | --- |
+| `activity` | `mode` | `idle_and_lock` | Pause tracking mode: `idle_and_lock` uses idle, lock, and suspend; `lock_only` uses screen lock and suspend only. |
 | `activity` | `poll_interval` | `5s` | How often the engine polls the provider. |
 | `activity` | `idle_threshold` | `5m` | Time before the user is considered idle. |
 | `server` | `listen_address` | `127.0.0.1:8787` | Web UI bind address. |
