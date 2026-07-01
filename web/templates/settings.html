@@ -1,44 +1,174 @@
 {{ define "content" }}
-<div class="card">
-  <h2>{{ T "Settings" }}</h2>
-  <form action="/settings" method="post">
-    <input type="hidden" name="csrf_token" value="{{ .CSRFToken }}">
-    <label>{{ T "ActivityMode" }}
-      <select name="activity_mode">
-        <option value="idle_and_lock" {{ if eq .Config.Activity.Mode "idle_and_lock" }}selected{{ end }}>{{ T "ActivityModeIdleAndLock" }}</option>
-        <option value="lock_only" {{ if eq .Config.Activity.Mode "lock_only" }}selected{{ end }}>{{ T "ActivityModeLockOnly" }}</option>
-      </select>
-    </label>
-    <label>{{ T "PollInterval" }} <input type="text" name="poll_interval" value="{{ .Config.Activity.PollInterval }}"></label>
-    <label>{{ T "IdleThreshold" }} <input type="text" name="idle_threshold" value="{{ .Config.Activity.IdleThreshold }}"></label>
-    <p class="muted">{{ T "IdleThresholdModeNote" }}</p>
-    <label>{{ T "ListenAddress" }} <input type="text" name="listen_address" value="{{ .Config.Server.ListenAddress }}"></label>
-    <label>{{ T "Timezone" }}
-      <select name="timezone">
-        <option value="local" {{ if eq .Config.App.Timezone "local" }}selected{{ end }}>{{ T "UseSystemTimezone" }}</option>
-        {{ range .Timezones }}
-          <option value="{{ . }}" {{ if eq . $.Config.App.Timezone }}selected{{ end }}>{{ . }}</option>
-        {{ end }}
-      </select>
-    </label>
-    <label>{{ T "Language" }}
-      <select name="language">
-        {{ range .Languages }}
-          <option value="{{ . }}" {{ if eq . $.Config.App.Language }}selected{{ end }}>{{ .NativeName }}</option>
-        {{ end }}
-      </select>
-    </label>
-    <fieldset class="weekday-settings">
-      <legend>{{ T "TodayWeekdays" }}</legend>
-      <div class="weekday-options">
-      {{ range .Weekdays }}
-        <label><input type="checkbox" name="today_weekdays" value="{{ .Value }}" {{ if .Selected }}checked{{ end }}> {{ .Label }}</label>
-      {{ end }}
+<h1 class="page-title">{{ T "Settings" }}</h1>
+<form action="/settings" method="post" class="settings-form" data-settings-form>
+  <input type="hidden" name="csrf_token" value="{{ .CSRFToken }}">
+  <input type="hidden" name="active_tab" value="{{ .ActiveTab }}" data-active-tab>
+  <div class="settings-layout">
+    <nav class="settings-nav" role="tablist" aria-label="{{ T "SettingsSections" }}" data-settings-nav hidden>
+      <button type="button" role="tab" id="tab-activity" class="active" data-settings-tab="activity" aria-controls="settings-activity" aria-selected="true" tabindex="0">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg>
+        {{ T "ActivitySettings" }}
+      </button>
+      <button type="button" role="tab" id="tab-workdays" data-settings-tab="workdays" aria-controls="settings-workdays" aria-selected="false" tabindex="-1">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="17" rx="2"/><path d="M3 9h18M8 2v4M16 2v4"/></svg>
+        {{ T "WorkdaySettings" }}
+      </button>
+      <button type="button" role="tab" id="tab-locale" data-settings-tab="locale" aria-controls="settings-locale" aria-selected="false" tabindex="-1">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3a14 14 0 0 1 0 18M12 3a14 14 0 0 0 0 18"/></svg>
+        {{ T "LocaleSettings" }}
+      </button>
+      <button type="button" role="tab" id="tab-server" data-settings-tab="server" aria-controls="settings-server" aria-selected="false" tabindex="-1">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="7" rx="2"/><rect x="3" y="13" width="18" height="7" rx="2"/><path d="M7 8h.01M7 17h.01"/></svg>
+        {{ T "ServerSettings" }}
+      </button>
+    </nav>
+
+    <div class="settings-content">
+      <section class="card settings-panel" role="tabpanel" id="settings-activity" data-settings-panel="activity" aria-labelledby="tab-activity" tabindex="0">
+        <div class="card-pad">
+          <h2>{{ T "ActivityDetection" }}</h2>
+          <p class="section-desc">{{ T "ActivityDetectionDesc" }}</p>
+
+          <label>{{ T "ActivityMode" }}
+            <select name="activity_mode" data-activity-mode>
+              <option value="idle_and_lock" {{ if eq .Config.ActivityMode "idle_and_lock" }}selected{{ end }}>{{ T "ActivityModeIdleAndLock" }}</option>
+              <option value="lock_only" {{ if eq .Config.ActivityMode "lock_only" }}selected{{ end }}>{{ T "ActivityModeLockOnly" }}</option>
+            </select>
+          </label>
+
+          <div class="field-row">
+            <label>{{ T "PollInterval" }}
+              <input type="text" name="poll_interval" value="{{ .Config.Activity.PollInterval }}">
+              <span class="hint">{{ T "PollIntervalHint" }}</span>
+            </label>
+            <label class="idle-threshold-field{{ if eq .Config.ActivityMode "lock_only" }} disabled{{ end }}" data-idle-threshold-field>{{ T "IdleThreshold" }}
+              <input type="text" name="idle_threshold" value="{{ .Config.Activity.IdleThreshold }}" data-idle-threshold {{ if eq .Config.ActivityMode "lock_only" }}readonly aria-disabled="true"{{ end }}>
+              <span class="hint">{{ T "IdleThresholdModeNote" }}</span>
+            </label>
+          </div>
+        </div>
+      </section>
+
+      <section class="card settings-panel" role="tabpanel" id="settings-workdays" data-settings-panel="workdays" aria-labelledby="tab-workdays" tabindex="0">
+        <div class="card-pad">
+          <h2>{{ T "WorkdaySettings" }}</h2>
+          <p class="section-desc">{{ T "WorkdaySettingsDesc" }}</p>
+          <fieldset class="weekday-settings">
+            <legend>{{ T "TodayWeekdays" }}</legend>
+            <div class="weekday-options">
+            {{ range .Weekdays }}
+              <label><input type="checkbox" name="today_weekdays" value="{{ .Value }}" {{ if .Selected }}checked{{ end }}> {{ .Label }}</label>
+            {{ end }}
+            </div>
+          </fieldset>
+        </div>
+      </section>
+
+      <section class="card settings-panel" role="tabpanel" id="settings-locale" data-settings-panel="locale" aria-labelledby="tab-locale" tabindex="0">
+        <div class="card-pad">
+          <h2>{{ T "LocaleSettings" }}</h2>
+          <p class="section-desc">{{ T "LocaleSettingsDesc" }}</p>
+          <div class="field-row">
+            <label>{{ T "Timezone" }}
+              <select name="timezone">
+                <option value="local" {{ if eq .Config.App.Timezone "local" }}selected{{ end }}>{{ T "UseSystemTimezone" }}</option>
+                {{ range .Timezones }}
+                  <option value="{{ . }}" {{ if eq . $.Config.App.Timezone }}selected{{ end }}>{{ . }}</option>
+                {{ end }}
+              </select>
+            </label>
+            <label>{{ T "Language" }}
+              <select name="language">
+                {{ range .Languages }}
+                  <option value="{{ . }}" {{ if eq . $.Config.App.Language }}selected{{ end }}>{{ .NativeName }}</option>
+                {{ end }}
+              </select>
+            </label>
+          </div>
+        </div>
+      </section>
+
+      <section class="card settings-panel" role="tabpanel" id="settings-server" data-settings-panel="server" aria-labelledby="tab-server" tabindex="0">
+        <div class="card-pad">
+          <h2>{{ T "ServerSettings" }}</h2>
+          <p class="section-desc">{{ T "ServerSettingsDesc" }}</p>
+          <label>{{ T "ListenAddress" }}
+            <input type="text" name="listen_address" value="{{ .Config.Server.ListenAddress }}">
+            <span class="hint">{{ T "ListenAddressHint" }}</span>
+          </label>
+        </div>
+      </section>
+
+      <div class="settings-actions">
+        <a class="btn secondary" href="/settings">{{ T "Discard" }}</a>
+        <button type="submit">{{ T "Save" }}</button>
       </div>
-    </fieldset>
-    <button type="submit">{{ T "Save" }}</button>
-  </form>
-  <p class="muted">{{ Tf "SettingsPersisted" (dict "Path" .ConfigPath) }}</p>
-  <p class="muted">{{ T "Version" }} {{ .Version }}</p>
-</div>
+
+      <p class="muted settings-note">{{ Tf "SettingsPersisted" (dict "Path" .ConfigPath) }} · {{ T "Version" }} {{ .Version }}</p>
+    </div>
+  </div>
+</form>
+
+<script>
+(() => {
+  const form = document.querySelector('[data-settings-form]');
+  if (!form) return;
+
+  const nav = form.querySelector('[data-settings-nav]');
+  const tabs = [...form.querySelectorAll('[data-settings-tab]')];
+  const panels = [...form.querySelectorAll('[data-settings-panel]')];
+  const activeTabInput = form.querySelector('[data-active-tab]');
+  const mode = form.querySelector('[data-activity-mode]');
+  const idleField = form.querySelector('[data-idle-threshold-field]');
+  const idleInput = form.querySelector('[data-idle-threshold]');
+
+  function showTab(name) {
+    tabs.forEach((tab) => {
+      const active = tab.dataset.settingsTab === name;
+      tab.classList.toggle('active', active);
+      tab.setAttribute('aria-selected', String(active));
+      tab.tabIndex = active ? 0 : -1;
+    });
+    panels.forEach((panel) => {
+      panel.hidden = panel.dataset.settingsPanel !== name;
+    });
+    if (activeTabInput) activeTabInput.value = name;
+  }
+
+  function updateIdleThreshold() {
+    const disabled = mode.value === 'lock_only';
+    idleField.classList.toggle('disabled', disabled);
+    idleInput.toggleAttribute('readonly', disabled);
+    idleInput.setAttribute('aria-disabled', String(disabled));
+  }
+
+  tabs.forEach((tab, i) => {
+    tab.addEventListener('click', () => {
+      showTab(tab.dataset.settingsTab);
+      history.replaceState(null, '', `#${tab.dataset.settingsTab}`);
+    });
+    tab.addEventListener('keydown', (event) => {
+      const step = { ArrowRight: 1, ArrowDown: 1, ArrowLeft: -1, ArrowUp: -1 }[event.key];
+      let target;
+      if (step) target = tabs[(i + step + tabs.length) % tabs.length];
+      else if (event.key === 'Home') target = tabs[0];
+      else if (event.key === 'End') target = tabs[tabs.length - 1];
+      if (!target) return;
+      event.preventDefault();
+      target.focus();
+      target.click();
+    });
+  });
+  mode.addEventListener('change', updateIdleThreshold);
+
+  // Reveal the tab bar now that JS is running; without JS the bar stays hidden
+  // and every panel remains visible, so all settings stay reachable.
+  if (nav) nav.hidden = false;
+
+  const candidates = [location.hash.slice(1), activeTabInput ? activeTabInput.value : ''];
+  const initial = candidates.find((name) => tabs.some((tab) => tab.dataset.settingsTab === name));
+  showTab(initial || 'activity');
+  updateIdleThreshold();
+})();
+</script>
 {{ end }}

@@ -899,16 +899,17 @@ func (s *Server) handleClosureDetail(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) handleSettings(w http.ResponseWriter, r *http.Request) {
-	s.renderSettings(w, r, s.config(), "", http.StatusOK)
+	s.renderSettings(w, r, s.config(), "", "", http.StatusOK)
 }
 
 // renderSettings renders the settings form for the given config. When flash is
 // non-empty it is shown as an error banner and the form keeps the submitted
 // values, so a validation failure on save does not discard the user's edits.
-func (s *Server) renderSettings(w http.ResponseWriter, r *http.Request, cfg config.Config, flash string, status int) {
+func (s *Server) renderSettings(w http.ResponseWriter, r *http.Request, cfg config.Config, flash, activeTab string, status int) {
 	data := map[string]any{
 		"Title":      "PageSettings",
 		"Nav":        "settings",
+		"ActiveTab":  activeTab,
 		"Config":     cfg,
 		"ConfigPath": s.paths.ConfigFile,
 		"Timezones":  []string{"UTC", "Europe/Berlin", "Europe/London", "America/New_York", "America/Los_Angeles", "Asia/Tokyo"},
@@ -940,7 +941,7 @@ func (s *Server) handleSettingsSave(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if err := cfg.Validate(); err != nil {
-		s.renderSettings(w, r, cfg, err.Error(), http.StatusBadRequest)
+		s.renderSettings(w, r, cfg, err.Error(), r.FormValue("active_tab"), http.StatusBadRequest)
 		return
 	}
 
