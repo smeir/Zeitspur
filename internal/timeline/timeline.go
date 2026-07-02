@@ -5,6 +5,7 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
+	"sort"
 	"time"
 )
 
@@ -47,6 +48,11 @@ func (s *Service) Range(ctx context.Context, start, end string) ([]*DaySummary, 
 	return s.summarize(ctx, start, end)
 }
 
+type interval struct {
+	start time.Time
+	end   time.Time
+}
+
 func (s *Service) summarize(ctx context.Context, start, end string) ([]*DaySummary, error) {
 	// Load day status.
 	rows, err := s.db.QueryContext(ctx, `
@@ -75,7 +81,7 @@ func (s *Service) summarize(ctx context.Context, start, end string) ([]*DaySumma
 
 	// Load work blocks.
 	blockRows, err := s.db.QueryContext(ctx, `
-		SELECT work_date, started_at, ended_at, source, status
+		SELECT work_date, started_at, ended_at, status
 		FROM work_blocks
 		WHERE work_date >= ? AND work_date <= ?
 		ORDER BY work_date ASC, started_at ASC
@@ -85,106 +91,115 @@ func (s *Service) summarize(ctx context.Context, start, end string) ([]*DaySumma
 	}
 	defer blockRows.Close()
 
-	type blockInfo struct {
-		date   string
-		start  time.Time
-		end    time.Time
-		source string
-		status string
-	}
-	var blocks []blockInfo
+	intervalsByDate := make(map[string][]interval)
 	for blockRows.Next() {
-		var b blockInfo
-		var startStr, endStr string
-		if err := blockRows.Scan(&b.date, &startStr, &endStr, &b.source, &b.status); err != nil {
+		var date, startStr, endStr, status string
+		if err := blockRows.Scan(&date, &startStr, &endStr, &status); err != nil {
 			return nil, err
 		}
-		b.start, _ = time.Parse(time.RFC3339Nano, startStr)
-		b.end, _ = time.Parse(time.RFC3339Nano, endStr)
-		blocks = append(blocks, b)
+		if _, ok := statusByDate[date]; !ok {
+			dateObj, _ := time.Parse("2006-01-02", date)
+			statusByDate[date] = &DaySummary{Date: date, DateObj: dateObj}
+		}
+		if status == "deleted" || status == "ignored" {
+			continue
+		}
+		var iv interval
+		if iv.start, err = time.Parse(time.RFC3339Nano, startStr); err != nil {
+			return nil, fmt.Errorf("parse started_at %q: %w", startStr, err)
+		}
+		if iv.end, err = time.Parse(time.RFC3339Nano, endStr); err != nil {
+			return nil, fmt.Errorf("parse ended_at %q: %w", endStr, err)
+		}
+		if iv.end.Before(iv.start) {
+			iv.end = iv.start
+		}
+		intervalsByDate[date] = append(intervalsByDate[date], iv)
 	}
 	if err := blockRows.Err(); err != nil {
 		return nil, err
 	}
 
-	// Ensure all block dates exist in statusByDate.
-	for _, b := range blocks {
-		if _, ok := statusByDate[b.date]; !ok {
-			dateObj, _ := time.Parse("2006-01-02", b.date)
-			statusByDate[b.date] = &DaySummary{Date: b.date, DateObj: dateObj}
-		}
-	}
-
-	// Aggregate.
-	for _, b := range blocks {
-		ds := statusByDate[b.date]
-		ds.BlockCount++
-		if b.status == "deleted" || b.status == "ignored" {
-			continue
-		}
-		d := b.end.Sub(b.start)
-		if d < 0 {
-			d = 0
-		}
-		ds.WorkedMinutes += int(d.Minutes())
-	}
-
-	// Compute pause minutes as gaps between blocks (active only).
-	for _, ds := range statusByDate {
-		var dayBlocks []blockInfo
-		for _, b := range blocks {
-			if b.date == ds.Date && b.status != "deleted" && b.status != "ignored" {
-				dayBlocks = append(dayBlocks, b)
+	// Aggregate per day. Overlapping blocks (e.g. a manual block over a detected
+	// one) are merged so overlapping time counts only once; pauses are the gaps
+	// between the merged intervals. Durations are summed before converting to
+	// minutes so per-block rounding does not accumulate.
+	for date, intervals := range intervalsByDate {
+		ds := statusByDate[date]
+		ds.BlockCount = len(intervals)
+		merged := mergeIntervals(intervals)
+		var worked, pause time.Duration
+		for i, iv := range merged {
+			worked += iv.end.Sub(iv.start)
+			if i > 0 {
+				pause += iv.start.Sub(merged[i-1].end)
 			}
 		}
-		for i := 1; i < len(dayBlocks); i++ {
-			gap := dayBlocks[i].start.Sub(dayBlocks[i-1].end)
-			if gap > 0 {
-				ds.PauseMinutes += int(gap.Minutes())
-			}
-		}
+		ds.WorkedMinutes = int(worked.Minutes())
+		ds.PauseMinutes = int(pause.Minutes())
 		ds.TotalMinutes = ds.WorkedMinutes + ds.PauseMinutes
 	}
 
-	// Sort result.
-	var result []*DaySummary
+	result := make([]*DaySummary, 0, len(statusByDate))
 	for _, ds := range statusByDate {
 		result = append(result, ds)
 	}
+	sort.Slice(result, func(i, j int) bool { return result[i].Date < result[j].Date })
 	return result, nil
+}
+
+// mergeIntervals merges overlapping or touching intervals. The input must be
+// sorted by start time.
+func mergeIntervals(intervals []interval) []interval {
+	var merged []interval
+	for _, iv := range intervals {
+		if n := len(merged); n > 0 && !iv.start.After(merged[n-1].end) {
+			if iv.end.After(merged[n-1].end) {
+				merged[n-1].end = iv.end
+			}
+			continue
+		}
+		merged = append(merged, iv)
+	}
+	return merged
 }
 
 // MinutesBetween sums active work-block minutes between two timestamps.
 func (s *Service) MinutesBetween(ctx context.Context, start, end time.Time) (int, error) {
-	var total int
 	rows, err := s.db.QueryContext(ctx, `
 		SELECT started_at, ended_at FROM work_blocks
 		WHERE status = 'active' AND started_at < ? AND ended_at > ?
-	`, end.Format(time.RFC3339Nano), start.Format(time.RFC3339Nano))
+	`, end.UTC().Format(time.RFC3339Nano), start.UTC().Format(time.RFC3339Nano))
 	if err != nil {
 		return 0, err
 	}
 	defer rows.Close()
 
+	var total time.Duration
 	for rows.Next() {
 		var startStr, endStr string
 		if err := rows.Scan(&startStr, &endStr); err != nil {
 			return 0, err
 		}
-		s0, _ := time.Parse(time.RFC3339Nano, startStr)
-		e0, _ := time.Parse(time.RFC3339Nano, endStr)
+		s0, err := time.Parse(time.RFC3339Nano, startStr)
+		if err != nil {
+			return 0, fmt.Errorf("parse started_at %q: %w", startStr, err)
+		}
+		e0, err := time.Parse(time.RFC3339Nano, endStr)
+		if err != nil {
+			return 0, fmt.Errorf("parse ended_at %q: %w", endStr, err)
+		}
 		if s0.Before(start) {
 			s0 = start
 		}
 		if e0.After(end) {
 			e0 = end
 		}
-		d := e0.Sub(s0)
-		if d > 0 {
-			total += int(d.Minutes())
+		if d := e0.Sub(s0); d > 0 {
+			total += d
 		}
 	}
-	return total, rows.Err()
+	return int(total.Minutes()), rows.Err()
 }
 
 // NullTimeToString returns an empty string for a NULL time.

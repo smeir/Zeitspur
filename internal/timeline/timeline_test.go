@@ -97,6 +97,76 @@ func TestService_PauseOnlyBetweenBlocks(t *testing.T) {
 	}
 }
 
+func TestService_OverlappingBlocksCountOnce(t *testing.T) {
+	db := newTestDB(t)
+	defer db.Close()
+
+	day := time.Date(2026, 6, 13, 0, 0, 0, 0, time.UTC)
+	// A manual block 09:00-17:00 fully covers a detected block 10:00-12:00.
+	insertBlock(t, db, day.Format("2006-01-02"), day.Add(9*time.Hour), day.Add(17*time.Hour), "manual", "active")
+	insertBlock(t, db, day.Format("2006-01-02"), day.Add(10*time.Hour), day.Add(12*time.Hour), "detected", "active")
+
+	svc := NewService(db)
+	sum, err := svc.Day(context.Background(), day.Format("2006-01-02"))
+	if err != nil {
+		t.Fatalf("day: %v", err)
+	}
+	if sum.WorkedMinutes != 480 {
+		t.Fatalf("expected 480 worked minutes for overlapping blocks, got %d", sum.WorkedMinutes)
+	}
+	if sum.PauseMinutes != 0 {
+		t.Fatalf("expected 0 pause minutes for overlapping blocks, got %d", sum.PauseMinutes)
+	}
+}
+
+func TestService_SubMinuteBlocksDoNotLoseTime(t *testing.T) {
+	db := newTestDB(t)
+	defer db.Close()
+
+	day := time.Date(2026, 6, 13, 0, 0, 0, 0, time.UTC)
+	// Four blocks of 5m30s each: 22 minutes total. Truncating each block
+	// individually would yield only 20.
+	for i := 0; i < 4; i++ {
+		start := day.Add(time.Duration(8+i) * time.Hour)
+		insertBlock(t, db, day.Format("2006-01-02"), start, start.Add(5*time.Minute+30*time.Second), "detected", "active")
+	}
+
+	svc := NewService(db)
+	sum, err := svc.Day(context.Background(), day.Format("2006-01-02"))
+	if err != nil {
+		t.Fatalf("day: %v", err)
+	}
+	if sum.WorkedMinutes != 22 {
+		t.Fatalf("expected 22 worked minutes, got %d", sum.WorkedMinutes)
+	}
+}
+
+func TestService_RangeSortedByDate(t *testing.T) {
+	db := newTestDB(t)
+	defer db.Close()
+
+	base := time.Date(2026, 6, 8, 0, 0, 0, 0, time.UTC)
+	// Insert days out of order.
+	for _, offset := range []int{4, 0, 2, 1, 3} {
+		day := base.AddDate(0, 0, offset)
+		insertBlock(t, db, day.Format("2006-01-02"), day.Add(9*time.Hour), day.Add(10*time.Hour), "detected", "active")
+	}
+
+	svc := NewService(db)
+	days, err := svc.Range(context.Background(), base.Format("2006-01-02"), base.AddDate(0, 0, 6).Format("2006-01-02"))
+	if err != nil {
+		t.Fatalf("range: %v", err)
+	}
+	if len(days) != 5 {
+		t.Fatalf("expected 5 days, got %d", len(days))
+	}
+	for i := 1; i < len(days); i++ {
+		if days[i-1].Date >= days[i].Date {
+			t.Fatalf("days not sorted: %s before %s", days[i-1].Date, days[i].Date)
+		}
+	}
+}
+
 func TestService_SingleBlockHasZeroPause(t *testing.T) {
 	db := newTestDB(t)
 	defer db.Close()

@@ -103,7 +103,7 @@ func (s *Server) currentBlock(ctx context.Context, date string) (*time.Time, int
 		SELECT occurred_at, event_type FROM activity_events
 		WHERE occurred_at >= ?
 		ORDER BY occurred_at ASC, id ASC
-	`, day.AddDate(0, 0, -1).Format(time.RFC3339Nano))
+	`, day.AddDate(0, 0, -1).UTC().Format(time.RFC3339Nano))
 	if err != nil {
 		return nil, 0
 	}
@@ -112,6 +112,7 @@ func (s *Server) currentBlock(ctx context.Context, date string) (*time.Time, int
 	startEvents := map[string]bool{
 		string(activity.EventActive):   true,
 		string(activity.EventUnlocked): true,
+		string(activity.EventResume):   true,
 	}
 	endEvents := map[string]bool{
 		string(activity.EventIdle):    true,
@@ -199,6 +200,8 @@ func (s *Server) blocksForDay(ctx context.Context, date string) ([]blockView, er
 	}
 	defer rows.Close()
 
+	// Timestamps are stored in UTC; convert for display in templates.
+	loc := s.location()
 	var blocks []blockView
 	for rows.Next() {
 		var b blockView
@@ -207,8 +210,12 @@ func (s *Server) blocksForDay(ctx context.Context, date string) ([]blockView, er
 		if err := rows.Scan(&b.ID, &b.Date, &startStr, &endStr, &b.Source, &b.Status, &note); err != nil {
 			return nil, err
 		}
-		b.Start, _ = time.Parse(time.RFC3339Nano, startStr)
-		b.End, _ = time.Parse(time.RFC3339Nano, endStr)
+		if t, err := time.Parse(time.RFC3339Nano, startStr); err == nil {
+			b.Start = t.In(loc)
+		}
+		if t, err := time.Parse(time.RFC3339Nano, endStr); err == nil {
+			b.End = t.In(loc)
+		}
 		b.StartStr = startStr
 		b.EndStr = endStr
 		if d := b.End.Sub(b.Start); d > 0 {
@@ -238,7 +245,7 @@ func (s *Server) handleDayBlock(w http.ResponseWriter, r *http.Request) {
 	_, err = s.db.ExecContext(r.Context(), `
 		INSERT INTO work_blocks (work_date, started_at, ended_at, source, status, note, created_at, updated_at)
 		VALUES (?, ?, ?, 'manual', 'active', ?, ?, ?)
-	`, date, s0.Format(time.RFC3339Nano), e0.Format(time.RFC3339Nano), note, now, now)
+	`, date, s0.UTC().Format(time.RFC3339Nano), e0.UTC().Format(time.RFC3339Nano), note, now, now)
 	if err != nil {
 		slog.Error("insert manual block failed", "error", err)
 	}
@@ -683,9 +690,13 @@ func (s *Server) handleBooking(w http.ResponseWriter, r *http.Request) {
 
 	if bookingDay != nil {
 		data["BookingDay"] = bookingDay
-		now := s.clk.Now().In(s.location()).Truncate(24 * time.Hour)
-		data["Overdue"] = bookingDay.Before(now)
-		data["DaysRemaining"] = int(bookingDay.Sub(now).Hours() / 24)
+		// The booking day is parsed as UTC midnight; compare against today's
+		// local date at UTC midnight. Truncate(24h) would cut at UTC midnight
+		// of the current instant and be off by one in the early morning hours.
+		now := s.clk.Now().In(s.location())
+		today := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, time.UTC)
+		data["Overdue"] = bookingDay.Before(today)
+		data["DaysRemaining"] = int(bookingDay.Sub(today).Hours() / 24)
 
 		periodStart, err := closure.NewRepository(s.db).PeriodStart(ctx, *bookingDay)
 		if err != nil {

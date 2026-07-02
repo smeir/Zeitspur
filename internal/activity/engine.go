@@ -21,6 +21,11 @@ type Engine struct {
 
 	lastState    ActivityState
 	lastActiveAt time.Time
+
+	// lastReconciledDay tracks the local midnight of the most recently
+	// reconciled day so the previous day gets a final rebuild (closing its
+	// open block at midnight) when work crosses a day boundary.
+	lastReconciledDay time.Time
 }
 
 // NewEngine creates a new activity engine.
@@ -193,6 +198,12 @@ func (e *Engine) reconcileCurrentDay(ctx context.Context, t time.Time) {
 		return
 	}
 	day := time.Date(t.Year(), t.Month(), t.Day(), 0, 0, 0, 0, t.Location())
+	if !e.lastReconciledDay.IsZero() && !e.lastReconciledDay.Equal(day) {
+		if err := e.reconciler.RebuildDay(ctx, t.Location(), e.lastReconciledDay); err != nil {
+			slog.Error("reconcile previous day failed", "error", err)
+		}
+	}
+	e.lastReconciledDay = day
 	if err := e.reconciler.RebuildDay(ctx, t.Location(), day); err != nil {
 		slog.Error("reconcile failed", "error", err)
 	}
@@ -215,6 +226,6 @@ func (e *Engine) insertEventAt(ctx context.Context, eventType EventType, occurre
 	_, err := e.db.ExecContext(ctx, `
 		INSERT INTO activity_events (occurred_at, event_type, provider, metadata_json, created_at)
 		VALUES (?, ?, ?, ?, ?)
-	`, occurredAt.Format(time.RFC3339Nano), string(eventType), e.provider.Name(), metaJSON, e.clock.Now().Format(time.RFC3339Nano))
+	`, occurredAt.UTC().Format(time.RFC3339Nano), string(eventType), e.provider.Name(), metaJSON, e.clock.Now().UTC().Format(time.RFC3339Nano))
 	return err
 }

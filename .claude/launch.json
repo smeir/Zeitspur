@@ -1,0 +1,15 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "zeitspur-preview",
+      "runtimeExecutable": "env",
+      "runtimeArgs": [
+        "HOME=/tmp/claude-1000/-home-sm-Dropbox-dev-zeitspur/8de70fe0-b304-4e60-9933-d9845b614667/scratchpad/phome",
+        "/tmp/claude-1000/-home-sm-Dropbox-dev-zeitspur/8de70fe0-b304-4e60-9933-d9845b614667/scratchpad/zeitspur-preview",
+        "serve"
+      ],
+      "port": 8799
+    }
+  ]
+}

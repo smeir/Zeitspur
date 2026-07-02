@@ -57,7 +57,7 @@ func (r *Reconciler) computeBlocks(ctx context.Context, start, end, now time.Tim
 		SELECT occurred_at, event_type FROM activity_events
 		WHERE occurred_at >= ? AND occurred_at < ?
 		ORDER BY occurred_at ASC, id ASC
-	`, start.Format(time.RFC3339Nano), end.Format(time.RFC3339Nano))
+	`, start.UTC().Format(time.RFC3339Nano), end.UTC().Format(time.RFC3339Nano))
 	if err != nil {
 		return nil, fmt.Errorf("query events: %w", err)
 	}
@@ -136,7 +136,7 @@ func (r *Reconciler) buildBlocks(rows *sql.Rows, now time.Time) ([]Block, error)
 
 func (r *Reconciler) persistDetectedBlocks(ctx context.Context, day time.Time, blocks []Block) error {
 	dateStr := day.Format("2006-01-02")
-	now := r.clock.Now().Format(time.RFC3339Nano)
+	now := r.clock.Now().UTC().Format(time.RFC3339Nano)
 
 	tx, err := r.db.BeginTx(ctx, nil)
 	if err != nil {
@@ -176,11 +176,11 @@ func (r *Reconciler) persistDetectedBlocks(ctx context.Context, day time.Time, b
 			}
 		}
 		for _, segment := range r.subtractIgnoredBlocks(segStart, segEnd, ignored) {
-			segDate := segment.Start.Format("2006-01-02")
+			segDate := segment.Start.In(day.Location()).Format("2006-01-02")
 			if _, err := tx.ExecContext(ctx, `
 				INSERT INTO work_blocks (work_date, started_at, ended_at, source, status, created_at, updated_at)
 				VALUES (?, ?, ?, 'detected', 'active', ?, ?)
-			`, segDate, segment.Start.Format(time.RFC3339Nano), segment.End.Format(time.RFC3339Nano), now, now); err != nil {
+			`, segDate, segment.Start.UTC().Format(time.RFC3339Nano), segment.End.UTC().Format(time.RFC3339Nano), now, now); err != nil {
 				return fmt.Errorf("insert detected block: %w", err)
 			}
 		}
@@ -231,7 +231,7 @@ func (r *Reconciler) extendOverlappingIgnoredBlocks(ctx context.Context, tx *sql
 		}
 		if _, err := tx.ExecContext(ctx, `
 			UPDATE work_blocks SET ended_at = ?, updated_at = ? WHERE id = ?
-		`, end.Format(time.RFC3339Nano), now, ig.ID); err != nil {
+		`, end.UTC().Format(time.RFC3339Nano), now, ig.ID); err != nil {
 			return end, ignored, fmt.Errorf("extend ignored block: %w", err)
 		}
 		ignored[i].End = end
