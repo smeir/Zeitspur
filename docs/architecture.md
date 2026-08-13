@@ -119,18 +119,29 @@ The codebase keeps three layers distinct:
 sequenceDiagram
   participant Engine as activity.Engine
   participant Provider as ActivityProvider
+  participant Logind as logind (D-Bus)
   participant DB as SQLite
   participant Reconciler as activity.Reconciler
 
-  loop every poll_interval
-    Engine->>Provider: CurrentState()
-    Provider-->>Engine: active | idle | locked | suspended | unknown
-    opt state changed
-      Engine->>DB: INSERT activity_events
+  par poll loop
+    loop every poll_interval
+      Engine->>Provider: CurrentState()
+      Provider-->>Engine: active | idle | locked | suspended | unknown
+      opt state changed
+        Engine->>DB: INSERT activity_events
+        Engine->>Reconciler: RebuildDay(loc, day)
+        Reconciler->>DB: SELECT activity_events
+        Reconciler->>Reconciler: computeBlocks
+        Reconciler->>DB: DELETE/INSERT work_blocks
+      end
+    end
+  and sleep signal (best effort)
+    Logind--)Engine: PrepareForSleep(true|false)
+    alt about to sleep
+      Engine->>DB: INSERT activity_events (suspend, now)
       Engine->>Reconciler: RebuildDay(loc, day)
-      Reconciler->>DB: SELECT activity_events
-      Reconciler->>Reconciler: computeBlocks
-      Reconciler->>DB: DELETE/INSERT work_blocks
+    else resumed
+      Engine->>Provider: CurrentState() (immediate poll)
     end
   end
 ```
@@ -152,6 +163,13 @@ The engine (`internal/activity/engine.go`) runs a ticker at `poll_interval`. On 
 - `idle` is emitted once `idle_threshold` has passed since the last activity in `idle_and_lock` mode; the timestamp is back-dated to the real idle start. `lock_only` mode does not emit idle events.
 - `locked` / `unlocked` and `suspend` / `resume` map directly to lock and power events.
 - `provider_error` is recorded once per consecutive failure with error metadata.
+
+Suspend/resume detection has two layers, independent of the chosen `ActivityProvider`:
+
+1. **Primary: logind signal.** `Engine.Run` subscribes to `org.freedesktop.login1.Manager.PrepareForSleep` on the system bus (`internal/activity/logind.go`'s `sleepWatcher`). `PrepareForSleep(true)` records a `suspend` event at the exact signal time; `PrepareForSleep(false)` (resume) triggers an immediate poll instead of waiting for the next tick, so the post-resume state and its timestamp are as accurate as possible. Subscribing is best-effort: if the system bus or logind is unavailable, the engine logs a warning and relies solely on layer 2.
+2. **Fallback: polling gap detection.** `tick` also compares the wall-clock time since the last active tick to `idle_threshold + 2*poll_interval`. If that gap is exceeded, it retroactively inserts a `suspend` event at the last known active time. This catches suspends even if the signal above was missed or is unavailable, at the cost of a coarser (back-dated) timestamp.
+
+Both layers only ever call `clock.Clock.Now()`, never `time.Now()` directly. This matters specifically for gap detection: `clock.System.Now()` strips the monotonic clock reading (`Round(0)`) before returning, because Go's monotonic clock is backed by `CLOCK_MONOTONIC` on Linux, which does not advance while the system is suspended. Without stripping it, `now.Sub(lastActiveAt)` would silently use the near-zero monotonic delta instead of the real wall-clock gap after a suspend/resume cycle, and the fallback in layer 2 would never trigger — which is exactly what happened in production before this was fixed.
 
 The reconciler (`internal/activity/reconcile.go`) computes `work_blocks` from the event stream:
 
@@ -384,13 +402,14 @@ Any change that would capture finer-grained data must be rejected or explicitly 
 
 Two abstractions keep the code testable:
 
-1. `clock.Clock` (`internal/clock/clock.go`) replaces direct calls to `time.Now()`. Tests use `clock.Fixed`.
-2. `activity.ActivityProvider` allows tests to inject a `MockProvider` instead of opening a real D-Bus connection.
+1. `clock.Clock` (`internal/clock/clock.go`) replaces direct calls to `time.Now()`. Tests use `clock.Fixed`. `clock.System` strips the monotonic clock reading (see Activity Detection And Event Flow) so its `Sub`/`Before`/`After` semantics match `Fixed` instead of silently diverging across a suspend.
+2. `activity.ActivityProvider` allows tests to inject a `MockProvider` instead of opening a real D-Bus connection. Similarly, `Engine.sleepEvents` can be set directly in white-box tests to simulate `PrepareForSleep` signals without a real system bus.
 
 Unit tests cover:
 
 - `internal/activity/reconcile_test.go` and `reconcile_dst_test.go` for block computation including DST transitions.
-- `internal/activity/engine_test.go` for polling and event insertion.
+- `internal/activity/engine_test.go` for polling, event insertion, and suspend/resume signal handling.
+- `internal/clock/clock_test.go` for the monotonic-clock-stripping guarantee of `System.Now()`.
 - `internal/timeline/timeline_test.go` for aggregation.
 - `internal/booking/repository_test.go` and `internal/booking/changed_test.go` for booking state.
 - `internal/closure/repository_test.go` for closure snapshots.

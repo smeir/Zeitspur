@@ -22,6 +22,12 @@ type Engine struct {
 	lastState    ActivityState
 	lastActiveAt time.Time
 
+	// sleepEvents delivers true shortly before the system suspends and false
+	// right after it resumes (see logind.go's sleepWatcher). Run sets it up
+	// from the real system bus unless a test has already injected a fake
+	// channel here.
+	sleepEvents <-chan bool
+
 	// lastReconciledDay tracks the local midnight of the most recently
 	// reconciled day so the previous day gets a final rebuild (closing its
 	// open block at midnight) when work crosses a day boundary.
@@ -86,12 +92,36 @@ func (e *Engine) restoreState(ctx context.Context) {
 	}
 }
 
-// Run polls the provider until the context is cancelled.
+// Run polls the provider until the context is cancelled. It also reacts
+// immediately to logind's PrepareForSleep signal when available, so suspend
+// and resume are recorded precisely instead of only being inferred from a
+// gap between poll ticks (see tick's gap detection, which remains active as
+// a fallback for missed or undelivered signals).
 func (e *Engine) Run(ctx context.Context) error {
 	ticker := time.NewTicker(e.pollInterval)
 	defer ticker.Stop()
 
+	if e.sleepEvents == nil {
+		if watcher, err := newSleepWatcher(); err != nil {
+			slog.Warn("suspend/resume signal unavailable, falling back to poll-based gap detection", "error", err)
+		} else {
+			defer watcher.Close()
+			e.sleepEvents = watcher.Events()
+		}
+	}
+
 	var lastErr error
+	poll := func() {
+		if err := e.Process(ctx); err != nil {
+			if lastErr == nil {
+				_ = e.insertEvent(ctx, EventProviderError, map[string]any{"error": err.Error()})
+			}
+			lastErr = err
+		} else {
+			lastErr = nil
+		}
+	}
+
 	for {
 		select {
 		case <-ctx.Done():
@@ -100,15 +130,18 @@ func (e *Engine) Run(ctx context.Context) error {
 				e.reconcileCurrentDay(context.Background(), e.lastActiveAt)
 			}
 			return nil
-		case <-ticker.C:
-			if err := e.Process(ctx); err != nil {
-				if lastErr == nil {
-					_ = e.insertEvent(ctx, EventProviderError, map[string]any{"error": err.Error()})
-				}
-				lastErr = err
+		case sleeping := <-e.sleepEvents:
+			if sleeping {
+				e.handleSuspendSignal(ctx)
 			} else {
-				lastErr = nil
+				// Resumed: re-poll immediately instead of waiting up to
+				// pollInterval for the next tick, so the post-resume state
+				// (active/locked/idle) and its timestamp are as accurate as
+				// possible.
+				poll()
 			}
+		case <-ticker.C:
+			poll()
 		}
 	}
 }
@@ -191,6 +224,26 @@ func (e *Engine) tick(ctx context.Context) error {
 	}
 
 	return nil
+}
+
+// handleSuspendSignal records a suspend event at the current time in
+// response to logind's PrepareForSleep(true) signal. Unlike the polling-based
+// gap detection in tick, which can only backdate the suspend to the last
+// successful poll, this is recorded at the moment the signal arrives, so it
+// is a no-op if the engine already knows it is suspended (e.g. tick's gap
+// detection or a duplicate signal already handled it).
+func (e *Engine) handleSuspendSignal(ctx context.Context) {
+	if e.lastState == ActivitySuspended {
+		return
+	}
+
+	now := e.clock.Now()
+	if err := e.insertEventAt(ctx, EventSuspend, now, nil); err != nil {
+		slog.Error("insert suspend event failed", "error", err)
+		return
+	}
+	e.lastState = ActivitySuspended
+	e.reconcileCurrentDay(ctx, now)
 }
 
 func (e *Engine) reconcileCurrentDay(ctx context.Context, t time.Time) {
