@@ -264,6 +264,8 @@ CSRF protection applies to every non-GET/HEAD request:
 
 The web UI never exposes the database directly; all access goes through the domain repositories.
 
+The Week and Month views accept an optional `date` query parameter (`YYYY-MM-DD`) so users can navigate to past or future periods. Without it, the current period is shown. The Week view additionally offers a jump-to-current-week link when the displayed week is not the ongoing one.
+
 ## Persistence Model
 
 ```mermaid

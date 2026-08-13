@@ -97,6 +97,7 @@ func NewCatalog() Catalog {
 			// Week view
 			"ISOWeekShort": "KW {{.Week}}",
 			"WeekRange":    "Woche {{.Start}} - {{.End}}",
+			"CurrentWeek":  "Aktuelle Woche",
 			"TotalTracked": "Gesamt",
 			"BookedDays":   "Gebuchte Tage",
 			"UnbookedDays": "Ungebuchte Tage",
@@ -251,6 +252,7 @@ func NewCatalog() Catalog {
 			// Week view
 			"ISOWeekShort": "Week {{.Week}}",
 			"WeekRange":    "Week {{.Start}} - {{.End}}",
+			"CurrentWeek":  "Current week",
 			"TotalTracked": "Total tracked",
 			"BookedDays":   "Booked days",
 			"UnbookedDays": "Unbooked days",

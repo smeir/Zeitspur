@@ -408,8 +408,106 @@ func TestServer_DayViewReflectsInactiveActivityStatus(t *testing.T) {
 	}
 }
 
-// TestStatusLabelCoverage guards against the catalog drifting out of sync with
-// the activity package: every ActivityState rendered in the UI must resolve to
+// TestServer_WeekNavigation verifies that /week honors the ?date= query
+// parameter and renders previous/next navigation links. When the displayed
+// week is the ongoing one, the jump-to-current-week button is hidden.
+func TestServer_WeekNavigation(t *testing.T) {
+	db, err := database.Open(t.TempDir() + "/test.db")
+	if err != nil {
+		t.Fatalf("open db: %v", err)
+	}
+	if err := database.Migrate(context.Background(), db); err != nil {
+		t.Fatalf("migrate: %v", err)
+	}
+	cfg := config.Config{}
+	cfg.Server.ListenAddress = "127.0.0.1:8787"
+	cfg.App.Timezone = "UTC"
+	paths := config.Paths{ConfigFile: t.TempDir() + "/config.toml"}
+	provider := activity.NewMockProvider(activity.ActivityActive)
+	now := time.Date(2026, 6, 17, 12, 0, 0, 0, time.UTC) // Wednesday, ISO week 25
+	srv, err := NewServer(db, cfg, paths, provider, clock.NewFixed(now), "test")
+	if err != nil {
+		t.Fatalf("new server: %v", err)
+	}
+
+	// Current week: no jump-to-current button, but prev/next links present.
+	req := httptest.NewRequest(http.MethodGet, "/week", nil)
+	rr := httptest.NewRecorder()
+	srv.ServeHTTP(rr, req)
+	if rr.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d", rr.Code)
+	}
+	body := rr.Body.String()
+	if !strings.Contains(body, "KW 25") {
+		t.Errorf("expected ISO week 25 label, got body:\n%s", body)
+	}
+	if !strings.Contains(body, "/week?date=2026-06-08") {
+		t.Errorf("expected previous-week link (2026-06-08), got body:\n%s", body)
+	}
+	if !strings.Contains(body, "/week?date=2026-06-22") {
+		t.Errorf("expected next-week link (2026-06-22), got body:\n%s", body)
+	}
+	if strings.Contains(body, "Aktuelle Woche") {
+		t.Errorf("did not expect current-week button on the ongoing week, got body:\n%s", body)
+	}
+
+	// Previous week: jump-to-current button should now appear.
+	req = httptest.NewRequest(http.MethodGet, "/week?date=2026-06-08", nil)
+	rr = httptest.NewRecorder()
+	srv.ServeHTTP(rr, req)
+	if rr.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d", rr.Code)
+	}
+	body = rr.Body.String()
+	if !strings.Contains(body, "KW 24") {
+		t.Errorf("expected ISO week 24 label, got body:\n%s", body)
+	}
+	if !strings.Contains(body, "Aktuelle Woche") {
+		t.Errorf("expected current-week button on a past week, got body:\n%s", body)
+	}
+}
+
+// TestServer_WeekNavigationTimezone verifies that the ?date= query parameter
+// is parsed in the configured location, so a date is not shifted to the
+// previous day in zones west of UTC (regression for time.Parse vs.
+// time.ParseInLocation).
+func TestServer_WeekNavigationTimezone(t *testing.T) {
+	db, err := database.Open(t.TempDir() + "/test.db")
+	if err != nil {
+		t.Fatalf("open db: %v", err)
+	}
+	if err := database.Migrate(context.Background(), db); err != nil {
+		t.Fatalf("migrate: %v", err)
+	}
+	cfg := config.Config{}
+	cfg.Server.ListenAddress = "127.0.0.1:8787"
+	cfg.App.Timezone = "America/New_York" // UTC-5 (EDT), west of UTC
+	paths := config.Paths{ConfigFile: t.TempDir() + "/config.toml"}
+	provider := activity.NewMockProvider(activity.ActivityActive)
+	now := time.Date(2026, 6, 17, 12, 0, 0, 0, time.UTC)
+	srv, err := NewServer(db, cfg, paths, provider, clock.NewFixed(now), "test")
+	if err != nil {
+		t.Fatalf("new server: %v", err)
+	}
+
+	// 2026-06-08 is a Monday (ISO week 24). With the buggy time.Parse path it
+	// would shift to Sunday 2026-06-07 20:00 EDT and land in ISO week 23.
+	req := httptest.NewRequest(http.MethodGet, "/week?date=2026-06-08", nil)
+	rr := httptest.NewRecorder()
+	srv.ServeHTTP(rr, req)
+	if rr.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d", rr.Code)
+	}
+	body := rr.Body.String()
+	if !strings.Contains(body, "KW 24") {
+		t.Errorf("expected ISO week 24 for 2026-06-08 in America/New_York, got body:\n%s", body)
+	}
+	if !strings.Contains(body, "/week?date=2026-06-01") {
+		t.Errorf("expected previous-week link (2026-06-01), got body:\n%s", body)
+	}
+}
+
+// TestStatusLabelCoverage ensures every defined ActivityState maps to
 // a dedicated label rather than silently falling back to the "Unknown" label.
 func TestStatusLabelCoverage(t *testing.T) {
 	cat := i18n.NewCatalog()

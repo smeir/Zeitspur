@@ -311,13 +311,24 @@ func (s *Server) updateBlockStatus(ctx context.Context, date, idStr, started, en
 
 func (s *Server) handleWeek(w http.ResponseWriter, r *http.Request) {
 	now := s.clk.Now().In(s.location())
-	start, end := weekBounds(now)
+	date := now
+	if d := r.URL.Query().Get("date"); d != "" {
+		// Parse in the configured location so a bare date like 2026-06-08
+		// is not shifted to the previous day in zones west of UTC.
+		if parsed, err := time.ParseInLocation("2006-01-02", d, s.location()); err == nil {
+			date = parsed
+		}
+	}
+	start, end := weekBounds(date)
 
 	startStr := start.Format("2006-01-02")
 	endStr := end.Format("2006-01-02")
 
 	tsvc := timeline.NewService(s.db)
-	days, _ := tsvc.Range(r.Context(), startStr, endStr)
+	days, err := tsvc.Range(r.Context(), startStr, endStr)
+	if err != nil {
+		slog.Error("week timeline range failed", "error", err, "start", startStr, "end", endStr)
+	}
 
 	total, booked, unbooked := 0, 0, 0
 	for _, d := range days {
@@ -329,15 +340,24 @@ func (s *Server) handleWeek(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
+	// Navigation anchors for the previous/next week buttons. The current-week
+	// flag hides the jump-to-today button when the displayed week is the
+	// ongoing one.
+	currentStart, _ := weekBounds(now)
+
 	s.renderLayout(w, r, "week", map[string]any{
-		"Title":        "PageWeek",
-		"Nav":          "week",
-		"WeekStart":    start,
-		"WeekEnd":      end,
-		"Days":         days,
-		"TotalMinutes": total,
-		"BookedDays":   booked,
-		"UnbookedDays": unbooked,
+		"Title":         "PageWeek",
+		"Nav":           "week",
+		"WeekStart":     start,
+		"WeekEnd":       end,
+		"ISOWeek":       isoWeek(start),
+		"Days":          days,
+		"TotalMinutes":  total,
+		"BookedDays":    booked,
+		"UnbookedDays":  unbooked,
+		"PrevWeek":      start.AddDate(0, 0, -7),
+		"NextWeek":      start.AddDate(0, 0, 7),
+		"IsCurrentWeek": sameDate(start, currentStart),
 	}, http.StatusOK)
 }
 
@@ -611,8 +631,10 @@ func sameInstant(a, b time.Time) bool {
 func (s *Server) handleMonth(w http.ResponseWriter, r *http.Request) {
 	date := s.clk.Now().In(s.location())
 	if d := r.URL.Query().Get("date"); d != "" {
-		if parsed, err := time.Parse("2006-01-02", d); err == nil {
-			date = parsed.In(s.location())
+		// Parse in the configured location so a bare date is not shifted
+		// to the previous day in zones west of UTC.
+		if parsed, err := time.ParseInLocation("2006-01-02", d, s.location()); err == nil {
+			date = parsed
 		}
 	}
 	monthStart := time.Date(date.Year(), date.Month(), 1, 0, 0, 0, 0, s.location())
