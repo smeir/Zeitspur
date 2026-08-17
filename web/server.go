@@ -12,6 +12,7 @@ import (
 	"fmt"
 	"html/template"
 	"log/slog"
+	"math"
 	"net/http"
 	"sync"
 	"time"
@@ -227,7 +228,9 @@ func (s *Server) renderLayout(w http.ResponseWriter, r *http.Request, name strin
 	data["CSRFToken"] = csrfToken(r)
 	data["Lang"] = string(locale)
 	data["Locale"] = locale
-	data["NavLayout"] = s.config().NavigationLayout()
+	cfg := s.config()
+	data["NavLayout"] = cfg.NavigationLayout()
+	data["Theme"] = cfg.Theme()
 	s.addActivityStatusData(r.Context(), data)
 	setTranslatedTitles(data, s.catalog, locale)
 	page, ok := s.templates[locale][name]
@@ -328,6 +331,9 @@ func templateFuncs(catalog i18n.Catalog, locale i18n.Locale) template.FuncMap {
 				return catalog.T(locale, "Booked")
 			}
 			return catalog.T(locale, "NotBooked")
+		},
+		"ceil": func(v float64) int {
+			return int(math.Ceil(v))
 		},
 	}
 }

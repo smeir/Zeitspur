@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"fmt"
 	"log/slog"
+	"math"
 	"net/http"
 	"strconv"
 	"strings"
@@ -678,20 +679,16 @@ func (s *Server) handleCopilot(w http.ResponseWriter, r *http.Request) {
 	todayEnd := todayStart.AddDate(0, 0, 1).Add(-time.Second)
 	yestStart := todayStart.AddDate(0, 0, -1)
 	yestEnd := todayStart.Add(-time.Second)
-	weekStart, _ := weekBounds(now)
-	weekEnd := weekStart.AddDate(0, 0, 7).Add(-time.Second)
 	monStart := time.Date(now.Year(), now.Month(), 1, 0, 0, 0, 0, loc)
 	monEnd := monStart.AddDate(0, 1, 0).Add(-time.Second)
 
 	todayEntries, _ := repo.Consumption(ctx, todayStart, todayEnd, loc)
 	yestEntries, _ := repo.Consumption(ctx, yestStart, yestEnd, loc)
-	weekEntries, _ := repo.Consumption(ctx, weekStart, weekEnd, loc)
 	monEntries, _ := repo.Consumption(ctx, monStart, monEnd, loc)
 
-	todayCons := sumConsumption(todayEntries)
-	yestCons := sumConsumption(yestEntries)
-	weekCons := sumConsumption(weekEntries)
-	monCons := sumConsumption(monEntries)
+	todayCons := copilot.TotalConsumed(todayEntries)
+	yestCons := copilot.TotalConsumed(yestEntries)
+	monCons := copilot.TotalConsumed(monEntries)
 	monDays := 0
 	for _, e := range monEntries {
 		if e.Consumed > 0 {
@@ -711,10 +708,6 @@ func (s *Server) handleCopilot(w http.ResponseWriter, r *http.Request) {
 	if trendAbs < 0 {
 		trendAbs = -trendAbs
 	}
-	monthPct := 0.0
-	if latest != nil && latest.OK && latest.EntitlementCredits > 0 {
-		monthPct = monCons / latest.EntitlementCredits * 100
-	}
 
 	data := map[string]any{
 		"Title":            "PageCopilot",
@@ -732,21 +725,14 @@ func (s *Server) handleCopilot(w http.ResponseWriter, r *http.Request) {
 		"NextFetchAt":      s.nextFetchAt(),
 		"ConsumptionLabel": periodLabel(period, start, end, s.locale(), s.catalog),
 		"Now":              now,
-		// KPI card values
+		// Hero stats
 		"TodayConsumed": todayCons,
 		"HasTrend":      hasTrend,
 		"TrendPercent":  trendPct,
 		"TrendAbs":      trendAbs,
 		"TrendUp":       trendPct >= 0,
 		"AvgPerDay":     avgPerDay,
-		"WeekConsumed":  weekCons,
-		"WeekStart":     weekStart,
-		"WeekEnd":       weekEnd,
-		"ISOWeek":       isoWeek(now),
-		"MonthConsumed": monCons,
-		"MonthDays":     monDays,
-		"MonthStart":    monStart,
-		"MonthPercent":  monthPct,
+		"Projection":    projectQuota(avgPerDay, latest, now),
 	}
 	if period == "month" {
 		data["ShowHeatmap"] = true
@@ -773,21 +759,6 @@ func (s *Server) handleCopilot(w http.ResponseWriter, r *http.Request) {
 		const circ = 2 * 3.141592653589793 * 82
 		data["RingDashArray"] = circ
 		data["RingDashOffset"] = circ * (1 - usedPercent/100)
-		if !latest.ResetAt.IsZero() {
-			data["ResetDays"] = daysBetween(now, latest.ResetAt)
-			periodStart := latest.ResetAt.AddDate(0, -1, 0)
-			progress := 0.0
-			if latest.ResetAt.After(periodStart) && now.After(periodStart) {
-				progress = now.Sub(periodStart).Seconds() / latest.ResetAt.Sub(periodStart).Seconds()
-				if progress < 0 {
-					progress = 0
-				}
-				if progress > 1 {
-					progress = 1
-				}
-			}
-			data["ResetProgress"] = progress * 100
-		}
 	}
 	s.renderLayout(w, r, "copilot", data, http.StatusOK)
 }
@@ -929,13 +900,71 @@ func buildHeatmap(entries []copilot.DailyConsumption, monthStart time.Time, loc 
 	return rows
 }
 
-// sumConsumption sums the consumed credits across entries.
-func sumConsumption(entries []copilot.DailyConsumption) float64 {
-	var s float64
-	for _, e := range entries {
-		s += e.Consumed
+// copilotProjection extrapolates whether the remaining entitlement lasts until
+// the quota reset if the average daily consumption continues at its current
+// rate. It is shown as a traffic-light footnote on the avg/day stat.
+type copilotProjection struct {
+	// Show is false when the projection cannot be computed (no reset date, no
+	// average, or no remaining credits to project).
+	Show bool
+	// Status is "ok" (green, lasts until reset), "tight" (yellow, reaches the
+	// limit within the last 3 days before reset), "over" (red, limit reached
+	// well before reset), or "reached" (red, limit already exhausted).
+	Status string
+	// ProjectedDate is the date at which the remaining credits run out at the
+	// current average; zero when the limit already lasts until reset.
+	ProjectedDate time.Time
+}
+
+// projectQuota computes the projection from the average daily consumption and
+// the latest entitlement/reset snapshot. Returns Show=false when the inputs are
+// unsuitable (no average, no reset, no entitlement, or limit disabled).
+func projectQuota(avgPerDay float64, latest *copilot.Snapshot, now time.Time) copilotProjection {
+	if latest == nil || !latest.OK || latest.ResetAt.IsZero() {
+		return copilotProjection{}
 	}
-	return s
+	if avgPerDay <= 0 || latest.EntitlementCredits <= 0 {
+		return copilotProjection{}
+	}
+	// Reset date already passed: the snapshot is stale until the next fetch
+	// refreshes ResetAt, so the projection would be misleading.
+	if latest.ResetAt.Before(now) {
+		return copilotProjection{}
+	}
+	remaining := latest.RemainingCredits
+	if remaining <= 0 {
+		return copilotProjection{Show: true, Status: "reached"}
+	}
+	daysUntilReset := int(math.Ceil(latest.ResetAt.Sub(now).Hours() / 24))
+	if daysUntilReset < 1 {
+		daysUntilReset = 1
+	}
+	daysLeft := int(remaining / avgPerDay)
+	if daysLeft >= daysUntilReset {
+		return copilotProjection{
+			Show:   true,
+			Status: "ok",
+		}
+	}
+	// Compare calendar dates in the configured timezone so day boundaries
+	// (not instants) decide the "tight" vs "over" threshold; otherwise a few
+	// hours of timezone offset could flip the status at the 3-day boundary.
+	loc := now.Location()
+	today := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, loc)
+	reset := latest.ResetAt.In(loc)
+	resetDay := time.Date(reset.Year(), reset.Month(), reset.Day(), 0, 0, 0, 0, loc)
+	projectedDate := today.AddDate(0, 0, daysLeft)
+	// "tight" when the limit is reached within the last 3 days before reset;
+	// otherwise the limit is exhausted well ahead of the reset ("over").
+	status := "over"
+	if projectedDate.After(resetDay.AddDate(0, 0, -3)) {
+		status = "tight"
+	}
+	return copilotProjection{
+		Show:          true,
+		Status:        status,
+		ProjectedDate: projectedDate,
+	}
 }
 
 // isCurrentPeriod reports whether the selected date/period covers "now", used to
@@ -948,19 +977,6 @@ func isCurrentPeriod(now, date time.Time, period string, start time.Time) bool {
 		cw, _ := weekBounds(now)
 		return sameDate(start, cw)
 	}
-}
-
-// daysBetween returns the whole-day count from "from" to "to" (at least 1),
-// used for the "reset in N days" chip.
-func daysBetween(from, to time.Time) int {
-	if to.Before(from) {
-		return 1
-	}
-	d := int(to.Sub(from).Hours() / 24)
-	if d < 1 {
-		d = 1
-	}
-	return d
 }
 
 // heatmapDow returns the Monday-first weekday header labels for the heatmap.
@@ -1014,6 +1030,7 @@ func (s *Server) handleMonth(w http.ResponseWriter, r *http.Request) {
 	}
 	monthStart := time.Date(date.Year(), date.Month(), 1, 0, 0, 0, 0, s.location())
 	monthEnd := monthStart.AddDate(0, 1, -1)
+	now := s.clk.Now().In(s.location())
 
 	startStr := monthStart.Format("2006-01-02")
 	endStr := monthEnd.Format("2006-01-02")
@@ -1066,12 +1083,13 @@ func (s *Server) handleMonth(w http.ResponseWriter, r *http.Request) {
 	}
 
 	s.renderLayout(w, r, "month", map[string]any{
-		"Title":     "PageMonth",
-		"Nav":       "month",
-		"Month":     monthStart,
-		"PrevMonth": monthStart.AddDate(0, -1, 0),
-		"NextMonth": monthStart.AddDate(0, 1, 0),
-		"Cells":     cells,
+		"Title":          "PageMonth",
+		"Nav":            "month",
+		"Month":          monthStart,
+		"PrevMonth":      monthStart.AddDate(0, -1, 0),
+		"NextMonth":      monthStart.AddDate(0, 1, 0),
+		"IsCurrentMonth": now.Year() == monthStart.Year() && now.Month() == monthStart.Month(),
+		"Cells":          cells,
 	}, http.StatusOK)
 }
 
@@ -1343,6 +1361,7 @@ func (s *Server) handleSettingsSave(w http.ResponseWriter, r *http.Request) {
 	cfg.App.Timezone = r.FormValue("timezone")
 	cfg.App.Language = r.FormValue("language")
 	cfg.App.Navigation = r.FormValue("navigation")
+	cfg.App.Theme = r.FormValue("theme")
 	if weekdays, ok := r.Form["today_weekdays"]; ok {
 		cfg.App.TodayWeekdays = weekdays
 	} else {

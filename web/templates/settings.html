@@ -107,6 +107,13 @@
             </select>
             <span class="hint">{{ T "NavigationHint" }}</span>
           </label>
+          <label>{{ T "ColorTheme" }}
+            <select name="theme">
+              <option value="teal" {{ if eq .Config.Theme "teal" }}selected{{ end }}>{{ T "ThemeTeal" }}</option>
+              <option value="aurora" {{ if eq .Config.Theme "aurora" }}selected{{ end }}>{{ T "ThemeAurora" }}</option>
+            </select>
+            <span class="hint">{{ T "ColorThemeHint" }}</span>
+          </label>
         </div>
       </section>
 

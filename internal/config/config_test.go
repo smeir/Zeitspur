@@ -146,6 +146,30 @@ func TestValidate_InvalidNavigation(t *testing.T) {
 	}
 }
 
+func TestValidate_InvalidTheme(t *testing.T) {
+	cfg, _ := Load("")
+	cfg.App.Theme = "noir"
+	if err := cfg.Validate(); err == nil || !strings.Contains(err.Error(), "theme") {
+		t.Fatalf("expected invalid theme error, got %v", err)
+	}
+}
+
+func TestTheme_DefaultsAndOverride(t *testing.T) {
+	cfg, _ := Load("")
+	if got := cfg.Theme(); got != "teal" {
+		t.Fatalf("default theme = %q, want teal", got)
+	}
+	cfg.App.Theme = "aurora"
+	if got := cfg.Theme(); got != "aurora" {
+		t.Fatalf("theme = %q, want aurora", got)
+	}
+	// Empty or unknown values fall back to the default.
+	cfg.App.Theme = ""
+	if got := cfg.Theme(); got != "teal" {
+		t.Fatalf("empty theme = %q, want teal", got)
+	}
+}
+
 func TestNavigationLayout_DefaultsAndOverride(t *testing.T) {
 	cfg, _ := Load("")
 	if got := cfg.NavigationLayout(); got != "top" {

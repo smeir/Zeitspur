@@ -291,8 +291,8 @@
         <div class="mini-status">
           <div class="ring" style="--progress: {{ .DayProgressPercent }};">
             <svg width="62" height="62" viewBox="0 0 62 62" aria-hidden="true">
-              <circle cx="31" cy="31" r="26" fill="none" stroke="#e2e8e6" stroke-width="7"/>
-              <circle class="ring-progress" cx="31" cy="31" r="26" fill="none" stroke="#0d9488" stroke-width="7" stroke-linecap="round"/>
+              <circle cx="31" cy="31" r="26" fill="none" stroke="var(--border)" stroke-width="7"/>
+              <circle class="ring-progress" cx="31" cy="31" r="26" fill="none" stroke="var(--accent)" stroke-width="7" stroke-linecap="round"/>
             </svg>
             <div class="ring-label">{{ .DayProgressPercent }}%</div>
           </div>

@@ -29,15 +29,16 @@
         <svg width="200" height="200" viewBox="0 0 200 200" aria-hidden="true">
           <defs>
             <linearGradient id="cpRing" x1="0%" y1="0%" x2="100%" y2="100%">
-              <stop offset="0%" stop-color="#2dd4bf"/>
-              <stop offset="100%" stop-color="#0d9488"/>
+              <stop offset="0%" style="stop-color: var(--accent-grad-from);"/>
+              <stop offset="100%" style="stop-color: var(--accent-grad-to);"/>
             </linearGradient>
           </defs>
           <circle class="cp-ring-track" cx="100" cy="100" r="82"/>
           <circle class="cp-ring-used" cx="100" cy="100" r="82" stroke-dasharray="{{ printf "%.2f" .RingDashArray }}" stroke-dashoffset="{{ printf "%.2f" .RingDashOffset }}"/>
         </svg>
         <div class="cp-ring-center">
-          <div class="cp-ring-pct">{{ printf "%.1f" .LatestUsedPercent }}%</div>
+          <div class="cp-ring-pct">{{ ceil .LatestUsedPercent }}%</div>
+          <div class="cp-ring-abs">{{ ceil .Latest.UsedCredits }} / {{ ceil .Latest.EntitlementCredits }}</div>
           <div class="cp-ring-label">{{ T "CopilotUsedLabel" }}</div>
           <div class="cp-ring-badge warn-{{ .Latest.WarningLevel }}">{{ .LatestWarning }}</div>
         </div>
@@ -48,15 +49,13 @@
           {{ if .Latest.Organizations }}<span class="cp-org">{{ T "CopilotOrganization" }}: <strong>{{ range $i, $o := .Latest.Organizations }}{{ if $i }}, {{ end }}{{ $o }}{{ end }}</strong></span>{{ end }}
         </div>
         <div class="cp-hero-stats">
-          <div class="cp-hero-stat"><div class="k">{{ T "CopilotEntitlement" }}</div><div class="v">{{ printf "%.0f" .Latest.EntitlementCredits }}</div></div>
-          <div class="cp-hero-stat"><div class="k">{{ T "CopilotUsed" }}</div><div class="v">{{ printf "%.1f" .Latest.UsedCredits }}</div></div>
-          <div class="cp-hero-stat"><div class="k">{{ T "CopilotRemaining" }}</div><div class="v">{{ printf "%.1f" .Latest.RemainingCredits }}</div></div>
+          <div class="cp-hero-stat"><div class="k">{{ T "CopilotConsumedToday" }}</div><div class="v">{{ ceil .TodayConsumed }}</div>{{ if .HasTrend }}<div class="f"><span class="{{ if .TrendUp }}cp-trend-up{{ else }}cp-trend-down{{ end }}">{{ if .TrendUp }}↑{{ else }}↓{{ end }} {{ printf "%.0f" .TrendAbs }}%</span></div>{{ end }}</div>
+          <div class="cp-hero-stat"><div class="k">{{ T "CopilotAvgPerDay" }}</div><div class="v">{{ ceil .AvgPerDay }}</div></div>
         </div>
-        {{ if not .Latest.ResetAt.IsZero }}
-        <div class="cp-reset">
-          <span class="cp-reset-chip">{{ Tf "CopilotResetIn" (dict "Days" .ResetDays) }}</span>
-          <span>{{ Tf "CopilotResetOn" (dict "Date" (dateShort .Latest.ResetAt) ) }}</span>
-          <div class="cp-reset-bar"><i style="width: {{ printf "%.0f" .ResetProgress }}%;"></i></div>
+        {{ if .Projection.Show }}
+        <div class="cp-proj cp-proj-{{ .Projection.Status }}">
+          <span class="cp-proj-dot"></span>
+          <span class="cp-proj-text">{{ if eq .Projection.Status "reached" }}{{ T "CopilotProjReached" }}{{ else if eq .Projection.Status "ok" }}{{ T "CopilotProjOk" }}{{ else }}{{ Tf "CopilotProjOn" (dict "Date" (dateShort .Projection.ProjectedDate)) }}{{ end }}</span>
         </div>
         {{ end }}
       </div>
@@ -65,45 +64,20 @@
 </div>
 {{ end }}
 
-<!-- KPI cards -->
-<div class="cp-kpis">
-  <div class="cp-kpi">
-    <div class="cp-kpi-label"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M8 7h8M8 12h8M8 17h5"/></svg>{{ T "CopilotConsumedToday" }}</div>
-    <div class="cp-kpi-value">{{ printf "%.1f" .TodayConsumed }}</div>
-    <div class="cp-kpi-foot">{{ dateShort .Now }}{{ if .HasTrend }} · <span class="{{ if .TrendUp }}cp-trend-up{{ else }}cp-trend-down{{ end }}">{{ if .TrendUp }}↑{{ else }}↓{{ end }} {{ printf "%.0f" .TrendAbs }}%</span>{{ end }}</div>
-  </div>
-  <div class="cp-kpi">
-    <div class="cp-kpi-label"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3v18h18"/><path d="M7 14l4-4 3 3 5-6"/></svg>{{ T "CopilotAvgPerDay" }}</div>
-    <div class="cp-kpi-value">{{ printf "%.1f" .AvgPerDay }}</div>
-    <div class="cp-kpi-foot">{{ Tf "CopilotAvgOverDays" (dict "Days" .MonthDays "Month" (month .MonthStart)) }}</div>
-  </div>
-  <div class="cp-kpi">
-    <div class="cp-kpi-label"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="17" rx="2"/><path d="M3 9h18M8 2v4M16 2v4"/></svg>{{ T "ThisWeek" }}</div>
-    <div class="cp-kpi-value">{{ printf "%.1f" .WeekConsumed }}</div>
-    <div class="cp-kpi-foot">{{ Tf "ISOWeekShort" (dict "Week" .ISOWeek) }} · {{ dateShort .WeekStart }} – {{ dateShort .WeekEnd }}</div>
-  </div>
-  <div class="cp-kpi">
-    <div class="cp-kpi-label"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="17" rx="2"/><path d="M3 9h18M8 2v4M16 2v4M8 14h3M8 18h6"/></svg>{{ T "CopilotThisMonth" }}</div>
-    <div class="cp-kpi-value">{{ printf "%.1f" .MonthConsumed }}</div>
-    <div class="cp-kpi-foot">{{ Tf "CopilotOfEntitlement" (dict "Pct" (printf "%.0f" .MonthPercent)) }}</div>
-  </div>
-</div>
-
 <!-- Consumption per day -->
 <div class="card">
   <div class="card-head">
     <h2><span class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3v18h18"/><path d="M7 14l4-4 3 3 5-6"/></svg></span>{{ T "CopilotConsumptionPerDay" }}</h2>
-    <div class="cp-seg">
-      <a class="{{ if eq .Period "week" }}active{{ end }}" href="/copilot?period=week&date={{ .Now.Format "2006-01-02" }}">{{ T "CopilotPeriodWeek" }}</a>
-      <a class="{{ if eq .Period "month" }}active{{ end }}" href="/copilot?period=month&date={{ .Now.Format "2006-01-02" }}">{{ T "CopilotPeriodMonth" }}</a>
-    </div>
-  </div>
-  <div class="cp-period-nav">
-    <span class="cp-period-label">{{ .ConsumptionLabel }}</span>
-    <div class="card-actions">
-      {{ if not .IsCurrent }}<a class="btn secondary btn-sm" href="/copilot?period={{ .Period }}">{{ T "CopilotCurrentPeriod" }}</a>{{ end }}
-      <a class="btn secondary btn-sm" href="/copilot?period={{ .Period }}&date={{ .PrevDate }}">{{ T "Previous" }}</a>
-      <a class="btn secondary btn-sm" href="/copilot?period={{ .Period }}&date={{ .NextDate }}">{{ T "Next" }}</a>
+    <div class="card-actions cp-head-right">
+      <div class="cp-seg">
+        <a class="{{ if eq .Period "week" }}active{{ end }}" href="/copilot?period=week&date={{ .Now.Format "2006-01-02" }}">{{ T "CopilotPeriodWeek" }}</a>
+        <a class="{{ if eq .Period "month" }}active{{ end }}" href="/copilot?period=month&date={{ .Now.Format "2006-01-02" }}">{{ T "CopilotPeriodMonth" }}</a>
+      </div>
+      <div class="period-nav">
+        <a class="period-nav-arrow" href="/copilot?period={{ .Period }}&date={{ .PrevDate }}" aria-label="{{ T "Previous" }}"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6"/></svg></a>
+        {{ if not .IsCurrent }}<a class="period-nav-label" href="/copilot?period={{ .Period }}">{{ .ConsumptionLabel }}</a>{{ else }}<span class="period-nav-label">{{ .ConsumptionLabel }}</span>{{ end }}
+        <a class="period-nav-arrow" href="/copilot?period={{ .Period }}&date={{ .NextDate }}" aria-label="{{ T "Next" }}"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18l6-6-6-6"/></svg></a>
+      </div>
     </div>
   </div>
   <div class="card-pad">
@@ -111,7 +85,7 @@
     <div class="cp-chart-scroll">
       <div class="cp-chart">
         {{ range .ChartDays }}
-        <div class="cp-bar-col{{ if .IsToday }} today{{ end }}{{ if .IsFuture }} future{{ end }}" title="{{ .DateStr }} · {{ if .Consumed }}{{ printf "%.1f" .Consumed }}{{ else }}{{ T "CopilotNoConsumption" }}{{ end }}">
+        <div class="cp-bar-col{{ if .IsToday }} today{{ end }}{{ if .IsFuture }} future{{ end }}" title="{{ .DateStr }} · {{ if .Consumed }}{{ ceil .Consumed }}{{ else }}{{ T "CopilotNoConsumption" }}{{ end }}">
           <div class="cp-bar-track">
             <div class="cp-bar" style="height: {{ .BarWidth }}%;"></div>
             {{ if .IsToday }}<div class="cp-bar-flag">{{ T "NavToday" }}</div>{{ end }}
@@ -126,7 +100,7 @@
       <span><i class="cp-i-today"></i>{{ T "NavToday" }}</span>
       <span><i class="cp-i-future"></i>{{ T "CopilotNoConsumption" }}</span>
     </div>
-    <p class="cp-total">{{ T "CopilotTotalConsumed" }}: <strong>{{ printf "%.1f" .TotalConsumed }}</strong></p>
+    <p class="cp-total">{{ T "CopilotTotalConsumed" }}: <strong>{{ ceil .TotalConsumed }}</strong></p>
     {{ else }}
     <div class="empty-state">{{ T "CopilotNoData" }}</div>
     {{ end }}
@@ -147,7 +121,7 @@
         {{ range .HeatmapDow }}<div class="cp-hm-dow">{{ . }}</div>{{ end }}
         {{ range .HeatmapRows }}
         <div class="cp-hm-row-label">{{ if gt .WeekNum 0 }}{{ Tf "ISOWeekShort" (dict "Week" .WeekNum) }}{{ end }}</div>
-        {{ range .Cells }}{{ if .Empty }}<div class="cp-hm-cell cp-hm-empty"></div>{{ else }}<div class="cp-hm-cell cp-hm-l{{ .Level }}{{ if .IsToday }} cp-hm-today{{ end }}{{ if .IsFuture }} cp-hm-future{{ end }}" title="{{ .DateStr }} · {{ if .Consumed }}{{ printf "%.1f" .Consumed }}{{ else }}{{ T "CopilotNoConsumption" }}{{ end }}">{{ .DayNum }}</div>{{ end }}{{ end }}
+        {{ range .Cells }}{{ if .Empty }}<div class="cp-hm-cell cp-hm-empty"></div>{{ else }}<div class="cp-hm-cell cp-hm-l{{ .Level }}{{ if .IsToday }} cp-hm-today{{ end }}{{ if .IsFuture }} cp-hm-future{{ end }}" title="{{ .DateStr }} · {{ if .Consumed }}{{ ceil .Consumed }}{{ else }}{{ T "CopilotNoConsumption" }}{{ end }}">{{ .DayNum }}</div>{{ end }}{{ end }}
         {{ end }}
       </div>
     </div>

@@ -7,7 +7,7 @@
   <link rel="stylesheet" href="/static/style.css">
   <script src="/static/htmx.min.js" defer></script>
 </head>
-<body class="{{ if eq .NavLayout "side" }}nav-side{{ end }}">
+<body class="{{ if eq .NavLayout "side" }}nav-side{{ end }}" data-theme="{{ .Theme }}">
   <header class="topbar">
     <div class="topbar-inner">
       <a class="brand" href="/">

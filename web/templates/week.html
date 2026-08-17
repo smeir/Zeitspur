@@ -2,10 +2,10 @@
 <div class="card">
   <div class="card-head">
     <h2>{{ Tf "ISOWeekShort" (dict "Week" .ISOWeek) }} · {{ Tf "WeekRange" (dict "Start" (dateShort .WeekStart) "End" (dateShort .WeekEnd)) }}</h2>
-    <div class="card-actions">
-      {{ if not .IsCurrentWeek }}<a class="btn secondary" href="/week">{{ T "CurrentWeek" }}</a>{{ end }}
-      <a class="btn secondary" href="/week?date={{ .PrevWeek.Format "2006-01-02" }}">{{ T "Previous" }}</a>
-      <a class="btn secondary" href="/week?date={{ .NextWeek.Format "2006-01-02" }}">{{ T "Next" }}</a>
+    <div class="period-nav">
+      <a class="period-nav-arrow" href="/week?date={{ .PrevWeek.Format "2006-01-02" }}" aria-label="{{ T "Previous" }}"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6"/></svg></a>
+      {{ if not .IsCurrentWeek }}<a class="period-nav-label" href="/week">{{ Tf "ISOWeekShort" (dict "Week" .ISOWeek) }} · {{ Tf "WeekRange" (dict "Start" (dateShort .WeekStart) "End" (dateShort .WeekEnd)) }}</a>{{ else }}<span class="period-nav-label">{{ Tf "ISOWeekShort" (dict "Week" .ISOWeek) }} · {{ Tf "WeekRange" (dict "Start" (dateShort .WeekStart) "End" (dateShort .WeekEnd)) }}</span>{{ end }}
+      <a class="period-nav-arrow" href="/week?date={{ .NextWeek.Format "2006-01-02" }}" aria-label="{{ T "Next" }}"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18l6-6-6-6"/></svg></a>
     </div>
   </div>
   <p>{{ T "TotalTracked" }}: {{ formatMinutes .TotalMinutes }} &middot; {{ T "BookedDays" }}: {{ .BookedDays }} &middot; {{ T "UnbookedDays" }}: {{ .UnbookedDays }}</p>

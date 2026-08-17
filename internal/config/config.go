@@ -21,6 +21,7 @@ const (
 	DefaultTimezone      = "local"
 	DefaultLanguage      = "de"
 	DefaultNavigation    = "top"
+	DefaultTheme         = "teal"
 
 	DefaultCopilotEnabled       = true
 	DefaultCopilotFetchInterval = 1 * time.Hour
@@ -80,6 +81,7 @@ type AppConfig struct {
 	Timezone      string   `toml:"timezone"`
 	Language      string   `toml:"language"`
 	Navigation    string   `toml:"navigation"`
+	Theme         string   `toml:"theme"`
 	TodayWeekdays []string `toml:"today_weekdays"`
 }
 
@@ -90,6 +92,17 @@ func (c Config) NavigationLayout() string {
 	v := strings.ToLower(strings.TrimSpace(c.App.Navigation))
 	if v != "top" && v != "side" {
 		return DefaultNavigation
+	}
+	return v
+}
+
+// Theme reports the configured color scheme: "teal" (default) or "aurora"
+// (indigo). The value is mirrored onto the <body data-theme="..."> attribute
+// and drives CSS variable overrides in style.css.
+func (c Config) Theme() string {
+	v := strings.ToLower(strings.TrimSpace(c.App.Theme))
+	if v != "teal" && v != "aurora" {
+		return DefaultTheme
 	}
 	return v
 }
@@ -221,6 +234,7 @@ func Load(path string) (Config, error) {
 			Timezone:      DefaultTimezone,
 			Language:      DefaultLanguage,
 			Navigation:    DefaultNavigation,
+			Theme:         DefaultTheme,
 			TodayWeekdays: append([]string(nil), defaultTodayWeekdays...),
 		},
 		Copilot: CopilotConfig{
@@ -304,6 +318,9 @@ func (c Config) Validate() error {
 	}
 	if c.App.Navigation != "" && c.App.Navigation != "top" && c.App.Navigation != "side" {
 		return fmt.Errorf("invalid navigation %q: must be 'top' or 'side'", c.App.Navigation)
+	}
+	if c.App.Theme != "" && c.App.Theme != "teal" && c.App.Theme != "aurora" {
+		return fmt.Errorf("invalid theme %q: must be 'teal' or 'aurora'", c.App.Theme)
 	}
 	if c.CopilotInterval() <= 0 {
 		return fmt.Errorf("copilot.fetch_interval must be positive")

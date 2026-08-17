@@ -252,6 +252,9 @@ func TestServer_SettingsRendersCopilotFields(t *testing.T) {
 		`name="copilot_fetch_interval"`,
 		`name="copilot_gh_path"`,
 		`name="copilot_daily_limit"`,
+		`name="theme"`,
+		`<option value="teal"`,
+		`<option value="aurora"`,
 	} {
 		if !strings.Contains(body, want) {
 			t.Errorf("settings page missing %q", want)
@@ -273,6 +276,7 @@ func TestServer_SettingsSavePersistsCopilotFields(t *testing.T) {
 	form.Set("timezone", "local")
 	form.Set("language", "de")
 	form.Set("today_weekdays", "mon")
+	form.Set("theme", "aurora")
 	form.Set("copilot_enabled", "true")
 	form.Set("copilot_fetch_interval", "1h")
 	form.Set("copilot_gh_path", "gh")
@@ -299,6 +303,9 @@ func TestServer_SettingsSavePersistsCopilotFields(t *testing.T) {
 	}
 	if cfg.CopilotDailyLimit() != 1800 {
 		t.Errorf("daily_limit = %d, want 1800", cfg.CopilotDailyLimit())
+	}
+	if cfg.Theme() != "aurora" {
+		t.Errorf("theme = %q, want aurora", cfg.Theme())
 	}
 }
 
@@ -378,11 +385,18 @@ func TestServer_CopilotPageRendersStatusCard(t *testing.T) {
 		t.Fatalf("expected 200, got %d", rr.Code)
 	}
 	body := rr.Body.String()
-	// The dashboard hero shows the used% ring, the entitlement, and the used
-	// credits. UsedCredits=1000 renders as "1000.0"; entitlement 5000 as "5000".
-	for _, want := range []string{"cp-ring-used", "5000", "1000.0"} {
+	// The dashboard hero shows the used% ring, the absolute "used / entitlement"
+	// totals inside the ring, and the warning badge. UsedCredits=1000,
+	// PercentRemaining=80 ⇒ used%=20 renders as "20%"; entitlement 5000 and
+	// used 1000 render as "1000 / 5000" (both ceiled, no decimals).
+	for _, want := range []string{"cp-ring-used", "20%", "1000 / 5000"} {
 		if !strings.Contains(body, want) {
 			t.Errorf("copilot page missing %q", want)
+		}
+	}
+	for _, gone := range []string{"1000.0", "cp-ring-month", "20.0%"} {
+		if strings.Contains(body, gone) {
+			t.Errorf("copilot page still contains %q", gone)
 		}
 	}
 	// The old verbose detail table (e.g. "Letzter Abruf") is gone; the hero now
@@ -706,8 +720,10 @@ func TestServer_WeekNavigation(t *testing.T) {
 	if !strings.Contains(body, "/week?date=2026-06-22") {
 		t.Errorf("expected next-week link (2026-06-22), got body:\n%s", body)
 	}
-	if strings.Contains(body, "Aktuelle Woche") {
-		t.Errorf("did not expect current-week button on the ongoing week, got body:\n%s", body)
+	// On the ongoing week the label is a non-clickable <span>; the jump-to-
+	// current link must not be present.
+	if strings.Contains(body, `class="period-nav-label" href="/week"`) {
+		t.Errorf("did not expect jump-to-current link on the ongoing week, got body:\n%s", body)
 	}
 
 	// Previous week: jump-to-current button should now appear.
@@ -721,8 +737,9 @@ func TestServer_WeekNavigation(t *testing.T) {
 	if !strings.Contains(body, "KW 24") {
 		t.Errorf("expected ISO week 24 label, got body:\n%s", body)
 	}
-	if !strings.Contains(body, "Aktuelle Woche") {
-		t.Errorf("expected current-week button on a past week, got body:\n%s", body)
+	// On a past week the label becomes a jump-to-current link.
+	if !strings.Contains(body, `class="period-nav-label" href="/week"`) {
+		t.Errorf("expected jump-to-current link on a past week, got body:\n%s", body)
 	}
 }
 

@@ -2,9 +2,10 @@
 <div class="card">
   <div class="card-head">
     <h2>{{ monthYear .Month }}</h2>
-    <div class="card-actions">
-      <a class="btn secondary" href="/month?date={{ .PrevMonth.Format "2006-01-02" }}">{{ T "Previous" }}</a>
-      <a class="btn secondary" href="/month?date={{ .NextMonth.Format "2006-01-02" }}">{{ T "Next" }}</a>
+    <div class="period-nav">
+      <a class="period-nav-arrow" href="/month?date={{ .PrevMonth.Format "2006-01-02" }}" aria-label="{{ T "Previous" }}"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6"/></svg></a>
+      {{ if not .IsCurrentMonth }}<a class="period-nav-label" href="/month">{{ monthYear .Month }}</a>{{ else }}<span class="period-nav-label">{{ monthYear .Month }}</span>{{ end }}
+      <a class="period-nav-arrow" href="/month?date={{ .NextMonth.Format "2006-01-02" }}" aria-label="{{ T "Next" }}"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18l6-6-6-6"/></svg></a>
     </div>
   </div>
   <div class="calendar">
