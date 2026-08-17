@@ -7,7 +7,7 @@
   <link rel="stylesheet" href="/static/style.css">
   <script src="/static/htmx.min.js" defer></script>
 </head>
-<body>
+<body class="{{ if eq .NavLayout "side" }}nav-side{{ end }}">
   <header class="topbar">
     <div class="topbar-inner">
       <a class="brand" href="/">
@@ -22,6 +22,7 @@
         <a href="/month" class="{{ if eq .Nav "month" }}active{{ end }}"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="17" rx="2"/><path d="M3 9h18M8 2v4M16 2v4M8 14h3M8 18h6"/></svg>{{ T "NavMonth" }}</a>
         <a href="/booking" class="{{ if eq .Nav "booking" }}active{{ end }}"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 11l3 3 8-8"/><path d="M20 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>{{ T "NavBooking" }}</a>
         <a href="/closures" class="{{ if eq .Nav "closures" }}active{{ end }}"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19V5a2 2 0 0 1 2-2h12a2 2 0 0 1 2 2v14l-4-2-4 2-4-2-4 2z"/></svg>{{ T "NavClosures" }}</a>
+        <a href="/copilot" class="{{ if eq .Nav "copilot" }}active{{ end }}"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2a10 10 0 1 0 10 10"/><path d="M12 12l4-4"/><circle cx="12" cy="12" r="1"/></svg>{{ T "NavCopilot" }}</a>
       </nav>
       <div class="topbar-right">
         <span class="live live-{{ .ActivityStatus }}"><span class="dot"></span>{{ statusLabel .ActivityStatus }}</span>

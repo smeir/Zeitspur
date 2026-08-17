@@ -34,6 +34,7 @@ func NewCatalog() Catalog {
 			"NavMonth":    "Monat",
 			"NavBooking":  "Buchung",
 			"NavClosures": "Abschlüsse",
+			"NavCopilot":  "Copilot",
 			"NavSettings": "Einstellungen",
 
 			// Page titles
@@ -44,6 +45,7 @@ func NewCatalog() Catalog {
 			"PageClosures":      "Abschlüsse",
 			"PageClosure":       "Abschluss",
 			"PageClosureDetail": "Abschlussdetails",
+			"PageCopilot":       "Copilot-Credits",
 			"PageSettings":      "Einstellungen",
 			"PageDay":           "Tag",
 
@@ -56,6 +58,7 @@ func NewCatalog() Catalog {
 			"Booking":                "Buchung",
 			"Booked":                 "gebucht",
 			"NotBooked":              "nicht gebucht",
+			"ChangedAfterBooking":    "Achtung: Dieser Tag wurde nach der Buchung geändert.",
 			"WorkBlocks":             "Arbeitsblöcke",
 			"NoWorkBlocks":           "Noch keine Arbeitsblöcke aufgezeichnet.",
 			"Start":                  "Start",
@@ -103,6 +106,7 @@ func NewCatalog() Catalog {
 			"UnbookedDays": "Ungebuchte Tage",
 			"Day":          "Tag",
 			"Blocks":       "Blöcke",
+			"Changed":      "Geändert",
 			"Yes":          "ja",
 			"No":           "nein",
 
@@ -168,6 +172,12 @@ func NewCatalog() Catalog {
 			"WorkdaySettingsDesc":     "An welchen Wochentagen Zeitspur automatisch auf der Heute-Seite erscheint.",
 			"LocaleSettings":          "Region & Sprache",
 			"LocaleSettingsDesc":      "Zeitzone und Sprache der Oberfläche.",
+			"AppearanceSettings":      "Erscheinungsbild",
+			"AppearanceSettingsDesc":  "Anordnung und Darstellung der Oberfläche.",
+			"Navigation":              "Navigation",
+			"NavigationHint":          "Position der Hauptnavigation. „Oben“ wie ein klassisches Top-Menü, „Links“ als seitliche Sidebar.",
+			"NavigationTop":           "Oben",
+			"NavigationSide":          "Links (Sidebar)",
 			"ServerSettings":          "Server",
 			"ServerSettingsDesc":      "Wo die lokale Web-Oberfläche erreichbar ist. Aus Sicherheitsgründen nur auf Localhost empfohlen.",
 			"ListenAddress":           "Listen-Adresse",
@@ -180,6 +190,79 @@ func NewCatalog() Catalog {
 			"Save":                    "Speichern",
 			"Version":                 "Version",
 			"SettingsPersisted":       "Einstellungen werden gespeichert in {{.Path}}",
+
+			// Copilot credits
+			"CopilotStatus":           "Aktueller Stand",
+			"CopilotPlan":             "Plan",
+			"CopilotOrganizations":    "Organisationen",
+			"CopilotEntitlement":      "Guthaben",
+			"CopilotRemaining":        "Verbleibend",
+			"CopilotUsed":             "Verbraucht",
+			"CopilotPercentRemaining": "Verbleibend %",
+			"CopilotResetAt":          "Reset am",
+			"CopilotBilling":          "Abrechnung",
+			"CopilotBillingToken":     "Token-basiert",
+			"CopilotBillingSeat":      "Sitze",
+			"CopilotConsumption":      "Verbrauch",
+			"CopilotConsumed":         "Verbraucht",
+			"CopilotSamples":          "Messungen",
+			"CopilotTotalConsumed":    "Gesamtverbrauch",
+			"CopilotNoData":           "Noch keine Copilot-Daten. Der Fetcher läuft stündlich; erste Daten erscheinen bald.",
+			"CopilotFetchError":       "Letzter Abruf fehlgeschlagen",
+
+			// Copilot fetch error kinds (see internal/copilot.ErrorKind)
+			"CopilotErrorUnavailable": "GitHub ist vorübergehend nicht erreichbar (Serverfehler). Der nächste Abruf versucht es automatisch erneut.",
+			"CopilotErrorNetwork":     "Keine Verbindung zu GitHub. Netzwerk oder Proxy prüfen; der nächste Abruf versucht es automatisch erneut.",
+			"CopilotErrorRateLimited": "GitHub-API-Limit erreicht. Der nächste Abruf versucht es automatisch erneut.",
+			"CopilotErrorAuth":        "GitHub CLI ist nicht angemeldet. Bitte 'gh auth login' ausführen.",
+			"CopilotErrorForbidden":   "GitHub verweigert den Zugriff. Token-Berechtigungen bzw. SSO-Freigabe prüfen.",
+			"CopilotErrorNoSeat":      "Kein Copilot-Zugang für dieses Konto gefunden.",
+			"CopilotErrorGhMissing":   "GitHub CLI (gh) nicht gefunden. Pfad in den Einstellungen prüfen.",
+			"CopilotErrorParse":       "Unerwartete Antwort von GitHub (keine Quota-Daten).",
+			"CopilotErrorUnknown":     "Abruf fehlgeschlagen.",
+			"CopilotPeriodWeek":       "Woche",
+			"CopilotPeriodMonth":      "Monat",
+			"CopilotCurrentPeriod":    "Aktuelle Periode",
+			"CopilotLastFetch":        "Letzter Abruf",
+			"CopilotNextFetch":        "Nächster Abruf",
+			"CopilotBillingPeriod":    "Abrechnungsperiode",
+			"CopilotWarningNone":      "OK",
+			"CopilotWarningNotice":    "Hinweis",
+			"CopilotWarningWarning":   "Warnung",
+			"CopilotWarningCritical":  "Kritisch",
+
+			// Copilot settings + notifications
+			"CopilotSettings":          "Copilot",
+			"CopilotSettingsDesc":      "Abruf der GitHub-Copilot-Credits über die GitHub-CLI.",
+			"CopilotEnabled":           "Abruf aktivieren",
+			"CopilotFetchInterval":     "Abrufintervall",
+			"CopilotFetchIntervalHint": "Wie oft die Credits abgerufen werden, z. B. 1h oder 30m.",
+			"CopilotGHPath":            "Pfad zu gh",
+			"CopilotDailyLimit":        "Tägliches Limit",
+			"CopilotDailyLimitHint":    "Verbrauchte Credits pro Tag, ab denen eine Desktop-Benachrichtigung erscheint. 0 deaktiviert die Benachrichtigung.",
+			"CopilotNotifyTitle":       "Copilot-Credit-Limit erreicht",
+			"CopilotNotifyBody":        "{{.Consumed}} von {{.Limit}} Credits heute verbraucht.",
+			"CopilotDailyLimitInvalid": "Das tägliche Limit muss eine nicht-negative Zahl sein.",
+
+			// Copilot dashboard (hero, KPIs, chart, heatmap)
+			"CopilotQuotaStatus":       "Kontingent-Status",
+			"CopilotUsedLabel":         "verbraucht",
+			"CopilotOrganization":      "Organisation",
+			"CopilotResetIn":           "Reset in {{.Days}} Tagen",
+			"CopilotResetOn":           "Zurücksetzung am {{.Date}}",
+			"CopilotConsumedToday":     "Verbrauch heute",
+			"CopilotAvgPerDay":         "Ø pro Tag",
+			"CopilotThisMonth":         "Diesen Monat",
+			"CopilotVsPrevDay":         "{{.Pct}}% ggü. Vortag",
+			"CopilotAvgOverDays":       "Ø über {{.Days}} Tage im {{.Month}}",
+			"CopilotOfEntitlement":     "{{.Pct}}% des Kontingents",
+			"CopilotConsumptionPerDay": "Verbrauch pro Tag",
+			"CopilotMonthOverview":     "Monatsübersicht",
+			"CopilotIntensity":         "Verbrauchsintensität pro Kalendertag",
+			"CopilotLess":              "weniger",
+			"CopilotMore":              "mehr",
+			"CopilotNoConsumption":     "kein Verbrauch",
+			"CopilotUpdatedAgo":        "aktualisiert vor {{.Min}} min",
 		},
 		English: {
 			// Navigation
@@ -188,6 +271,7 @@ func NewCatalog() Catalog {
 			"NavMonth":    "Month",
 			"NavBooking":  "Booking",
 			"NavClosures": "Closures",
+			"NavCopilot":  "Copilot",
 			"NavSettings": "Settings",
 
 			// Page titles
@@ -198,6 +282,7 @@ func NewCatalog() Catalog {
 			"PageClosures":      "Closures",
 			"PageClosure":       "Closure",
 			"PageClosureDetail": "Closure Detail",
+			"PageCopilot":       "Copilot Credits",
 			"PageSettings":      "Settings",
 			"PageDay":           "Day",
 
@@ -324,6 +409,12 @@ func NewCatalog() Catalog {
 			"WorkdaySettingsDesc":     "On which weekdays Zeitspur appears automatically on the Today page.",
 			"LocaleSettings":          "Region & language",
 			"LocaleSettingsDesc":      "Timezone and interface language.",
+			"AppearanceSettings":      "Appearance",
+			"AppearanceSettingsDesc":  "Layout and presentation of the interface.",
+			"Navigation":              "Navigation",
+			"NavigationHint":          "Position of the primary navigation. \u201cTop\u201d as a classic menu bar, \u201cLeft\u201d as a vertical sidebar.",
+			"NavigationTop":           "Top",
+			"NavigationSide":          "Left (sidebar)",
 			"ServerSettings":          "Server",
 			"ServerSettingsDesc":      "Where the local web interface is reachable. Localhost is recommended for security.",
 			"ListenAddress":           "Listen address",
@@ -336,6 +427,79 @@ func NewCatalog() Catalog {
 			"Save":                    "Save",
 			"Version":                 "Version",
 			"SettingsPersisted":       "Settings are persisted to {{.Path}}",
+
+			// Copilot credits
+			"CopilotStatus":           "Current status",
+			"CopilotPlan":             "Plan",
+			"CopilotOrganizations":    "Organizations",
+			"CopilotEntitlement":      "Entitlement",
+			"CopilotRemaining":        "Remaining",
+			"CopilotUsed":             "Used",
+			"CopilotPercentRemaining": "Remaining %",
+			"CopilotResetAt":          "Resets at",
+			"CopilotBilling":          "Billing",
+			"CopilotBillingToken":     "Token-based",
+			"CopilotBillingSeat":      "Seat-based",
+			"CopilotConsumption":      "Consumption",
+			"CopilotConsumed":         "Consumed",
+			"CopilotSamples":          "Samples",
+			"CopilotTotalConsumed":    "Total consumed",
+			"CopilotNoData":           "No Copilot data yet. The fetcher runs hourly; the first samples appear shortly.",
+			"CopilotFetchError":       "Last fetch failed",
+
+			// Copilot fetch error kinds (see internal/copilot.ErrorKind)
+			"CopilotErrorUnavailable": "GitHub is temporarily unavailable (server error). The next fetch retries automatically.",
+			"CopilotErrorNetwork":     "GitHub could not be reached. Check network or proxy; the next fetch retries automatically.",
+			"CopilotErrorRateLimited": "GitHub API rate limit reached. The next fetch retries automatically.",
+			"CopilotErrorAuth":        "GitHub CLI is not authenticated. Please run 'gh auth login'.",
+			"CopilotErrorForbidden":   "GitHub denied access. Check token permissions or SSO authorization.",
+			"CopilotErrorNoSeat":      "No Copilot access found for this account.",
+			"CopilotErrorGhMissing":   "GitHub CLI (gh) not found. Check the path in the settings.",
+			"CopilotErrorParse":       "Unexpected response from GitHub (no quota data).",
+			"CopilotErrorUnknown":     "Fetch failed.",
+			"CopilotPeriodWeek":       "Week",
+			"CopilotPeriodMonth":      "Month",
+			"CopilotCurrentPeriod":    "Current period",
+			"CopilotLastFetch":        "Last fetch",
+			"CopilotNextFetch":        "Next fetch",
+			"CopilotBillingPeriod":    "Billing period",
+			"CopilotWarningNone":      "OK",
+			"CopilotWarningNotice":    "Notice",
+			"CopilotWarningWarning":   "Warning",
+			"CopilotWarningCritical":  "Critical",
+
+			// Copilot settings + notifications
+			"CopilotSettings":          "Copilot",
+			"CopilotSettingsDesc":      "Fetching GitHub Copilot credits via the GitHub CLI.",
+			"CopilotEnabled":           "Enable fetching",
+			"CopilotFetchInterval":     "Fetch interval",
+			"CopilotFetchIntervalHint": "How often credits are fetched, e.g. 1h or 30m.",
+			"CopilotGHPath":            "Path to gh",
+			"CopilotDailyLimit":        "Daily limit",
+			"CopilotDailyLimitHint":    "Credits consumed per day at which a desktop notification appears. 0 disables notifications.",
+			"CopilotNotifyTitle":       "Copilot credit limit reached",
+			"CopilotNotifyBody":        "{{.Consumed}} of {{.Limit}} credits consumed today.",
+			"CopilotDailyLimitInvalid": "The daily limit must be a non-negative number.",
+
+			// Copilot dashboard (hero, KPIs, chart, heatmap)
+			"CopilotQuotaStatus":       "Quota status",
+			"CopilotUsedLabel":         "used",
+			"CopilotOrganization":      "Organization",
+			"CopilotResetIn":           "Reset in {{.Days}} days",
+			"CopilotResetOn":           "Resets on {{.Date}}",
+			"CopilotConsumedToday":     "Consumed today",
+			"CopilotAvgPerDay":         "Avg per day",
+			"CopilotThisMonth":         "This month",
+			"CopilotVsPrevDay":         "{{.Pct}}% vs. yesterday",
+			"CopilotAvgOverDays":       "Avg over {{.Days}} days in {{.Month}}",
+			"CopilotOfEntitlement":     "{{.Pct}}% of entitlement",
+			"CopilotConsumptionPerDay": "Consumption per day",
+			"CopilotMonthOverview":     "Month overview",
+			"CopilotIntensity":         "Consumption intensity per day",
+			"CopilotLess":              "less",
+			"CopilotMore":              "more",
+			"CopilotNoConsumption":     "no consumption",
+			"CopilotUpdatedAgo":        "updated {{.Min}} min ago",
 		},
 	}
 }
@@ -384,6 +548,28 @@ func (c Catalog) SourceLabel(locale Locale, source string) string {
 		return label
 	}
 	return source
+}
+
+// WarningLabel returns the localized label for a Copilot quota warning level.
+// The lookup key is derived as "CopilotWarning"+PascalCase(level); unknown
+// values fall back to the localized OK label (CopilotWarningNone).
+func (c Catalog) WarningLabel(locale Locale, level string) string {
+	key := "CopilotWarning" + pascalCase(level)
+	if label := c.T(locale, key); label != key {
+		return label
+	}
+	return c.T(locale, "CopilotWarningNone")
+}
+
+// ErrorLabel returns the localized description for a Copilot fetch error kind.
+// The lookup key is derived as "CopilotError"+PascalCase(kind); unknown or
+// empty values fall back to the generic CopilotErrorUnknown text.
+func (c Catalog) ErrorLabel(locale Locale, kind string) string {
+	key := "CopilotError" + pascalCase(kind)
+	if label := c.T(locale, key); label != key {
+		return label
+	}
+	return c.T(locale, "CopilotErrorUnknown")
 }
 
 // pascalCase converts a snake_case, kebab-case or space-separated identifier to

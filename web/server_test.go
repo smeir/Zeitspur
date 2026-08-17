@@ -5,6 +5,8 @@ import (
 	"database/sql"
 	"net/http"
 	"net/http/httptest"
+	"net/url"
+	"os"
 	"strings"
 	"testing"
 	"time"
@@ -12,6 +14,7 @@ import (
 	"github.com/smeir/zeitspur/internal/activity"
 	"github.com/smeir/zeitspur/internal/clock"
 	"github.com/smeir/zeitspur/internal/config"
+	"github.com/smeir/zeitspur/internal/copilot"
 	"github.com/smeir/zeitspur/internal/database"
 	"github.com/smeir/zeitspur/internal/i18n"
 )
@@ -231,6 +234,262 @@ func TestServer_StaticAssets(t *testing.T) {
 	srv.ServeHTTP(rr, req)
 	if rr.Code != http.StatusOK {
 		t.Fatalf("expected 200, got %d", rr.Code)
+	}
+}
+
+func TestServer_SettingsRendersCopilotFields(t *testing.T) {
+	srv, _ := newTestServer(t)
+	req := httptest.NewRequest(http.MethodGet, "/settings", nil)
+	rr := httptest.NewRecorder()
+	srv.ServeHTTP(rr, req)
+	if rr.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d", rr.Code)
+	}
+	body := rr.Body.String()
+	for _, want := range []string{
+		`data-settings-tab="copilot"`,
+		`name="copilot_enabled"`,
+		`name="copilot_fetch_interval"`,
+		`name="copilot_gh_path"`,
+		`name="copilot_daily_limit"`,
+	} {
+		if !strings.Contains(body, want) {
+			t.Errorf("settings page missing %q", want)
+		}
+	}
+}
+
+func TestServer_SettingsSavePersistsCopilotFields(t *testing.T) {
+	srv, _ := newTestServer(t)
+	token := fetchCSRToken(t, srv)
+
+	form := url.Values{}
+	form.Set("csrf_token", token)
+	form.Set("active_tab", "copilot")
+	form.Set("activity_mode", "idle_and_lock")
+	form.Set("poll_interval", "30s")
+	form.Set("idle_threshold", "5m")
+	form.Set("listen_address", "127.0.0.1:8787")
+	form.Set("timezone", "local")
+	form.Set("language", "de")
+	form.Set("today_weekdays", "mon")
+	form.Set("copilot_enabled", "true")
+	form.Set("copilot_fetch_interval", "1h")
+	form.Set("copilot_gh_path", "gh")
+	form.Set("copilot_daily_limit", "1800")
+
+	req := httptest.NewRequest(http.MethodPost, "/settings", strings.NewReader(form.Encode()))
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	req.AddCookie(&http.Cookie{Name: "csrf_token", Value: token})
+	rr := httptest.NewRecorder()
+	srv.ServeHTTP(rr, req)
+	if rr.Code != http.StatusFound {
+		t.Fatalf("expected redirect, got %d", rr.Code)
+	}
+
+	cfg, err := config.Load(srv.paths.ConfigFile)
+	if err != nil {
+		t.Fatalf("reload config: %v", err)
+	}
+	if !cfg.CopilotEnabled() {
+		t.Errorf("copilot enabled not persisted")
+	}
+	if cfg.Copilot.FetchInterval != "1h" {
+		t.Errorf("fetch_interval = %q", cfg.Copilot.FetchInterval)
+	}
+	if cfg.CopilotDailyLimit() != 1800 {
+		t.Errorf("daily_limit = %d, want 1800", cfg.CopilotDailyLimit())
+	}
+}
+
+func TestServer_SettingsSaveRejectsInvalidDailyLimit(t *testing.T) {
+	srv, _ := newTestServer(t)
+	token := fetchCSRToken(t, srv)
+
+	form := url.Values{}
+	form.Set("csrf_token", token)
+	form.Set("active_tab", "copilot")
+	form.Set("activity_mode", "idle_and_lock")
+	form.Set("poll_interval", "30s")
+	form.Set("idle_threshold", "5m")
+	form.Set("listen_address", "127.0.0.1:8787")
+	form.Set("timezone", "local")
+	form.Set("language", "de")
+	form.Set("today_weekdays", "mon")
+	form.Set("copilot_enabled", "true")
+	form.Set("copilot_fetch_interval", "1h")
+	form.Set("copilot_gh_path", "gh")
+	form.Set("copilot_daily_limit", "abc") // non-numeric
+
+	req := httptest.NewRequest(http.MethodPost, "/settings", strings.NewReader(form.Encode()))
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	req.AddCookie(&http.Cookie{Name: "csrf_token", Value: token})
+	rr := httptest.NewRecorder()
+	srv.ServeHTTP(rr, req)
+
+	if rr.Code != http.StatusBadRequest {
+		t.Fatalf("expected 400 for non-numeric daily_limit, got %d", rr.Code)
+	}
+	body := rr.Body.String()
+	if !strings.Contains(body, "nicht-negative Zahl") {
+		t.Errorf("expected localized error message in body, got: %s", body)
+	}
+
+	// The config file must not have been rewritten with a silent default.
+	if _, err := os.Stat(srv.paths.ConfigFile); !os.IsNotExist(err) {
+		cfg, _ := config.Load(srv.paths.ConfigFile)
+		if cfg.CopilotDailyLimit() == config.DefaultCopilotDailyLimit {
+			t.Errorf("daily_limit silently reset to default %d", config.DefaultCopilotDailyLimit)
+		}
+	}
+}
+
+func TestServer_CopilotPageRendersStatusCard(t *testing.T) {
+	srv, db := newTestServer(t)
+	ctx := context.Background()
+
+	// Empty state: renders the no-data placeholder, not a broken template.
+	req := httptest.NewRequest(http.MethodGet, "/copilot", nil)
+	rr := httptest.NewRecorder()
+	srv.ServeHTTP(rr, req)
+	if rr.Code != http.StatusOK {
+		t.Fatalf("expected 200 for empty state, got %d", rr.Code)
+	}
+
+	// Populate one successful snapshot.
+	repo := copilot.NewRepository(db)
+	snap := &copilot.Snapshot{
+		OK:                 true,
+		Plan:               "test-plan",
+		EntitlementCredits: 5000,
+		RemainingCredits:   4000,
+		UsedCredits:        1000,
+		PercentRemaining:   80,
+		WarningLevel:       copilot.WarningNotice,
+	}
+	if err := repo.Store(ctx, snap); err != nil {
+		t.Fatalf("store snapshot: %v", err)
+	}
+
+	req = httptest.NewRequest(http.MethodGet, "/copilot", nil)
+	rr = httptest.NewRecorder()
+	srv.ServeHTTP(rr, req)
+	if rr.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d", rr.Code)
+	}
+	body := rr.Body.String()
+	// The dashboard hero shows the used% ring, the entitlement, and the used
+	// credits. UsedCredits=1000 renders as "1000.0"; entitlement 5000 as "5000".
+	for _, want := range []string{"cp-ring-used", "5000", "1000.0"} {
+		if !strings.Contains(body, want) {
+			t.Errorf("copilot page missing %q", want)
+		}
+	}
+	// The old verbose detail table (e.g. "Letzter Abruf") is gone; the hero now
+	// uses a compact "aktualisiert vor … min" subtitle.
+	for _, gone := range []string{"Letzter Abruf"} {
+		if strings.Contains(body, gone) {
+			t.Errorf("copilot page still contains trimmed label %q", gone)
+		}
+	}
+}
+
+func TestServer_CopilotPageHidesQuotaOnFailedFetch(t *testing.T) {
+	srv, db := newTestServer(t)
+	ctx := context.Background()
+
+	// A failed snapshot: OK=false, no quota numbers.
+	repo := copilot.NewRepository(db)
+	if err := repo.Store(ctx, &copilot.Snapshot{
+		OK:           false,
+		ErrorMessage: "boom",
+	}); err != nil {
+		t.Fatalf("store snapshot: %v", err)
+	}
+
+	req := httptest.NewRequest(http.MethodGet, "/copilot", nil)
+	rr := httptest.NewRecorder()
+	srv.ServeHTTP(rr, req)
+	if rr.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d", rr.Code)
+	}
+	body := rr.Body.String()
+
+	// The error box must be shown.
+	if !strings.Contains(body, "copilotFetchError") && !strings.Contains(body, "boom") {
+		t.Errorf("expected error message in body")
+	}
+	// The quota ring is hidden on failure (it lives inside the hero, which only
+	// renders for a successful snapshot).
+	for _, gone := range []string{"cp-ring-used"} {
+		if strings.Contains(body, gone) {
+			t.Errorf("copilot page shows quota on failed fetch: %q", gone)
+		}
+	}
+}
+
+// TestServer_CopilotPageClassifiesFetchError asserts that a transient upstream
+// failure (GitHub outage) renders as a neutral info box with its own wording,
+// while a local problem (missing authentication) stays a warning that names the
+// required action.
+func TestServer_CopilotPageClassifiesFetchError(t *testing.T) {
+	tests := []struct {
+		name         string
+		snap         *copilot.Snapshot
+		want         string
+		wantInfoBox  bool
+		unwantedText string
+	}{
+		{
+			name: "github outage",
+			snap: &copilot.Snapshot{
+				OK:           false,
+				ErrorKind:    copilot.ErrorKindUnavailable,
+				ErrorMessage: "copilot fetch: GitHub is temporarily unavailable (HTTP 503)",
+			},
+			want:         "vor\u00fcbergehend nicht erreichbar",
+			wantInfoBox:  true,
+			unwantedText: "gh auth login",
+		},
+		{
+			name: "not authenticated",
+			snap: &copilot.Snapshot{
+				OK:           false,
+				ErrorKind:    copilot.ErrorKindAuth,
+				ErrorMessage: "copilot fetch: GitHub CLI is not authenticated (HTTP 401)",
+			},
+			want:        "gh auth login",
+			wantInfoBox: false,
+		},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			srv, db := newTestServer(t)
+			if err := copilot.NewRepository(db).Store(context.Background(), tc.snap); err != nil {
+				t.Fatalf("store snapshot: %v", err)
+			}
+
+			req := httptest.NewRequest(http.MethodGet, "/copilot", nil)
+			rr := httptest.NewRecorder()
+			srv.ServeHTTP(rr, req)
+			if rr.Code != http.StatusOK {
+				t.Fatalf("expected 200, got %d", rr.Code)
+			}
+			body := rr.Body.String()
+			if !strings.Contains(body, tc.want) {
+				t.Errorf("copilot page missing localized hint %q", tc.want)
+			}
+			if tc.unwantedText != "" && strings.Contains(body, tc.unwantedText) {
+				t.Errorf("copilot page should not contain %q for a transient failure", tc.unwantedText)
+			}
+			if got := strings.Contains(body, "info-box"); got != tc.wantInfoBox {
+				t.Errorf("info-box present = %v, want %v", got, tc.wantInfoBox)
+			}
+			// The raw upstream detail stays visible for debugging.
+			if !strings.Contains(body, "HTTP") {
+				t.Error("expected the raw error detail to be rendered")
+			}
+		})
 	}
 }
 

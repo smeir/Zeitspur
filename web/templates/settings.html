@@ -17,9 +17,17 @@
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3a14 14 0 0 1 0 18M12 3a14 14 0 0 0 0 18"/></svg>
         {{ T "LocaleSettings" }}
       </button>
+      <button type="button" role="tab" id="tab-appearance" data-settings-tab="appearance" aria-controls="settings-appearance" aria-selected="false" tabindex="-1">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="3"/><path d="M9 3v18"/></svg>
+        {{ T "AppearanceSettings" }}
+      </button>
       <button type="button" role="tab" id="tab-server" data-settings-tab="server" aria-controls="settings-server" aria-selected="false" tabindex="-1">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="7" rx="2"/><rect x="3" y="13" width="18" height="7" rx="2"/><path d="M7 8h.01M7 17h.01"/></svg>
         {{ T "ServerSettings" }}
+      </button>
+      <button type="button" role="tab" id="tab-copilot" data-settings-tab="copilot" aria-controls="settings-copilot" aria-selected="false" tabindex="-1">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
+        {{ T "CopilotSettings" }}
       </button>
     </nav>
 
@@ -88,6 +96,20 @@
         </div>
       </section>
 
+      <section class="card settings-panel" role="tabpanel" id="settings-appearance" data-settings-panel="appearance" aria-labelledby="tab-appearance" tabindex="0">
+        <div class="card-pad">
+          <h2>{{ T "AppearanceSettings" }}</h2>
+          <p class="section-desc">{{ T "AppearanceSettingsDesc" }}</p>
+          <label>{{ T "Navigation" }}
+            <select name="navigation">
+              <option value="top" {{ if eq .Config.NavigationLayout "top" }}selected{{ end }}>{{ T "NavigationTop" }}</option>
+              <option value="side" {{ if eq .Config.NavigationLayout "side" }}selected{{ end }}>{{ T "NavigationSide" }}</option>
+            </select>
+            <span class="hint">{{ T "NavigationHint" }}</span>
+          </label>
+        </div>
+      </section>
+
       <section class="card settings-panel" role="tabpanel" id="settings-server" data-settings-panel="server" aria-labelledby="tab-server" tabindex="0">
         <div class="card-pad">
           <h2>{{ T "ServerSettings" }}</h2>
@@ -95,6 +117,33 @@
           <label>{{ T "ListenAddress" }}
             <input type="text" name="listen_address" value="{{ .Config.Server.ListenAddress }}">
             <span class="hint">{{ T "ListenAddressHint" }}</span>
+          </label>
+        </div>
+      </section>
+
+      <section class="card settings-panel" role="tabpanel" id="settings-copilot" data-settings-panel="copilot" aria-labelledby="tab-copilot" tabindex="0">
+        <div class="card-pad">
+          <h2>{{ T "CopilotSettings" }}</h2>
+          <p class="section-desc">{{ T "CopilotSettingsDesc" }}</p>
+
+          <label class="checkbox-field">
+            <input type="checkbox" name="copilot_enabled" value="true" {{ if .Config.CopilotEnabled }}checked{{ end }}>
+            {{ T "CopilotEnabled" }}
+          </label>
+
+          <div class="field-row">
+            <label>{{ T "CopilotFetchInterval" }}
+              <input type="text" name="copilot_fetch_interval" value="{{ .Config.Copilot.FetchInterval }}">
+              <span class="hint">{{ T "CopilotFetchIntervalHint" }}</span>
+            </label>
+            <label>{{ T "CopilotGHPath" }}
+              <input type="text" name="copilot_gh_path" value="{{ .Config.CopilotGHPath }}">
+            </label>
+          </div>
+
+          <label>{{ T "CopilotDailyLimit" }}
+            <input type="number" name="copilot_daily_limit" value="{{ .Config.CopilotDailyLimit }}" min="0" step="1">
+            <span class="hint">{{ T "CopilotDailyLimitHint" }}</span>
           </label>
         </div>
       </section>

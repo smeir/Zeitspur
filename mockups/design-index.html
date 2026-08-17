@@ -12,12 +12,14 @@
   h1 { font-size: 1.8rem; font-weight: 800; letter-spacing: -0.02em; }
   p.sub { color: #6b7088; margin-top: 8px; font-size: 1rem; }
   .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 22px; margin-top: 36px; }
+  .grid .card.full { grid-column: 1 / -1; }
   @media (max-width: 720px) { .grid { grid-template-columns: 1fr; } }
   .card { background: #fff; border: 1px solid #e8eaf2; border-radius: 18px; overflow: hidden; box-shadow: 0 6px 20px rgba(20,23,46,0.06); text-decoration: none; color: inherit; transition: transform .15s, box-shadow .15s; display: block; }
   .card:hover { transform: translateY(-4px); box-shadow: 0 16px 36px rgba(20,23,46,0.12); }
   .thumb { height: 200px; position: relative; display: flex; align-items: center; justify-content: center; color: #fff; font-weight: 800; font-size: 1.4rem; letter-spacing: -0.02em; }
   .thumb.a { background: linear-gradient(135deg, #6366f1, #8b5cf6); }
   .thumb.b { background: linear-gradient(135deg, #14b8a6, #0d9488); }
+  .thumb.c { background: linear-gradient(135deg, #0ea5e9, #6366f1); }
   .thumb svg { width: 48px; height: 48px; margin-bottom: 10px; }
   .body { padding: 20px 22px; }
   .tag { font-size: 0.72rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.06em; color: #8a8fa8; }
@@ -26,14 +28,14 @@
   .features { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 14px; }
   .features span { font-size: 0.76rem; background: #eef0f7; color: #4a4f6a; padding: 4px 10px; border-radius: 999px; font-weight: 600; }
   .open { display: inline-flex; align-items: center; gap: 8px; margin-top: 18px; font-weight: 700; font-size: 0.9rem; }
-  .card.a .open { color: #6366f1; } .card.b .open { color: #0d9488; }
+  .card.a .open { color: #6366f1; } .card.b .open { color: #0d9488; } .card.c .open { color: #6366f1; }
   .note { margin-top: 36px; padding: 16px 18px; background: #eef0ff; border-radius: 12px; font-size: 0.88rem; color: #4f46e5; border: 1px solid #e0e3ff; }
 </style>
 </head>
 <body>
 <div class="wrap">
   <h1>Zeitspur — Design-Mockups</h1>
-  <p class="sub">Zwei helle, moderne Entwürfe für die Arbeitszeit-App. Beide zeigen die <b>Heute</b>-Ansicht mit realistischen Daten. Im Browser öffnen und vergleichen.</p>
+  <p class="sub">Helle, moderne Entwürfe für die Arbeitszeit-App. Die <b>Heute</b>-Ansichten (A/B) und das <b>Copilot</b>-Dashboard (C) mit realistischen Daten. Im Browser öffnen und vergleichen.</p>
   <div class="grid">
     <a class="card a" href="design-a-aurora.html">
       <div class="thumb a"><div><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg><div>Design A</div></div></div>
@@ -42,6 +44,16 @@
         <h2>Aurora — Soft Sidebar</h2>
         <p>Ruhige Sidebar-App mit viel Whitespace, Indigo-Akzent und einer sanften Timeline-Visualisierung. Klare Typografie, großzügige Karten.</p>
         <div class="features"><span>Sidebar-Navigation</span><span>Indigo</span><span>Timeline</span><span>Wochen-Strip</span></div>
+        <span class="open">Im Browser öffnen →</span>
+      </div>
+    </a>
+    <a class="card c full" href="design-copilot.html">
+      <div class="thumb c"><div><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2a4 4 0 0 1 4 4v1h1a3 3 0 0 1 3 3v2a3 3 0 0 1-3 3h-1v1a4 4 0 0 1-4 4 4 4 0 0 1-4-4v-1H7a3 3 0 0 1-3-3v-2a3 3 0 0 1 3-3h1V6a4 4 0 0 1 4-4z"/><path d="M12 9v6M9 12h6"/></svg><div>Copilot-Dashboard</div></div></div>
+      <div class="body">
+        <div class="tag">Entwurf 03</div>
+        <h2>Copilot — Kredit-Verbrauch</h2>
+        <p>Dashboard für den GitHub-Copilot-Kreditverbrauch: Kontingent-Ring, KPI-Karten, Tages-Balkendiagramm (Tag/Woche/Monat) und Monats-Heatmap.</p>
+        <div class="features"><span>Kontingent-Ring</span><span>KPI-Karten</span><span>Balkendiagramm</span><span>Heatmap</span></div>
         <span class="open">Im Browser öffnen →</span>
       </div>
     </a>

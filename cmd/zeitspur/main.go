@@ -16,7 +16,9 @@ import (
 	"github.com/smeir/zeitspur/internal/booking"
 	"github.com/smeir/zeitspur/internal/clock"
 	"github.com/smeir/zeitspur/internal/config"
+	"github.com/smeir/zeitspur/internal/copilot"
 	"github.com/smeir/zeitspur/internal/database"
+	"github.com/smeir/zeitspur/internal/i18n"
 	"github.com/smeir/zeitspur/internal/systemd"
 	"github.com/smeir/zeitspur/internal/timeline"
 	"github.com/smeir/zeitspur/internal/timeutil"
@@ -175,6 +177,38 @@ func runServe() error {
 		}
 	}()
 
+	if cfg.CopilotEnabled() {
+		copilotRepo := copilot.NewRepository(db)
+		copilotProvider := copilot.NewGHCLIProvider(cfg.CopilotGHPath())
+		copilotFetcher := copilot.NewFetcher(copilotRepo, copilotProvider, clk, cfg.CopilotInterval())
+
+		if limit := cfg.CopilotDailyLimit(); limit > 0 {
+			loc := cfg.Location()
+			var notifier copilot.Notifier = copilot.LogNotifier{}
+			if n, err := copilot.NewFreedesktopNotifier(config.AppName); err != nil {
+				slog.Warn("copilot: desktop notifications unavailable, falling back to log", "error", err)
+			} else {
+				notifier = n
+			}
+			state := copilot.NewStateStore(db)
+			alerter := copilot.NewAlerter(copilotRepo, state, notifier, clk, loc, limit, copilotMessageBuilder(cfg))
+			defer alerter.Close()
+			copilotFetcher.WithAlerter(alerter)
+			slog.Info("copilot daily-limit alerts enabled", "limit", limit)
+		} else {
+			slog.Info("copilot daily-limit alerts disabled (limit=0)")
+		}
+
+		go func() {
+			if err := copilotFetcher.Run(ctx); err != nil && err != context.Canceled {
+				slog.Error("copilot fetcher stopped", "error", err)
+			}
+		}()
+		slog.Info("copilot tracking enabled", "interval", cfg.CopilotInterval())
+	} else {
+		slog.Info("copilot tracking disabled")
+	}
+
 	server, err := web.NewServer(db, cfg, paths, provider, clk, version)
 	if err != nil {
 		return err
@@ -287,4 +321,20 @@ func processExists(pid int) bool {
 		return false
 	}
 	return p.Signal(syscall.Signal(0)) == nil
+}
+
+// copilotMessageBuilder returns a closure that builds localized notification
+// text from the configured language. The capture package must not import i18n
+// (boundary rule), so the strings are built here in the cmd layer.
+func copilotMessageBuilder(cfg config.Config) copilot.MessageBuilder {
+	catalog := i18n.NewCatalog()
+	locale := i18n.ParseLocale(cfg.App.Language)
+	return func(consumed float64, limit int) (string, string) {
+		title := catalog.T(locale, "CopilotNotifyTitle")
+		body := catalog.Tf(locale, "CopilotNotifyBody", map[string]any{
+			"Consumed": fmt.Sprintf("%.0f", consumed),
+			"Limit":    limit,
+		})
+		return title, body
+	}
 }

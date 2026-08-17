@@ -20,6 +20,11 @@ const (
 	DefaultListenAddress = "127.0.0.1:8787"
 	DefaultTimezone      = "local"
 	DefaultLanguage      = "de"
+	DefaultNavigation    = "top"
+
+	DefaultCopilotEnabled       = true
+	DefaultCopilotFetchInterval = 1 * time.Hour
+	DefaultCopilotDailyLimit    = 2500
 )
 
 const (
@@ -55,6 +60,7 @@ type Config struct {
 	Activity ActivityConfig `toml:"activity"`
 	Server   ServerConfig   `toml:"server"`
 	App      AppConfig      `toml:"app"`
+	Copilot  CopilotConfig  `toml:"copilot"`
 }
 
 // ActivityConfig holds activity-detection settings.
@@ -73,7 +79,27 @@ type ServerConfig struct {
 type AppConfig struct {
 	Timezone      string   `toml:"timezone"`
 	Language      string   `toml:"language"`
+	Navigation    string   `toml:"navigation"`
 	TodayWeekdays []string `toml:"today_weekdays"`
+}
+
+// NavigationLayout reports the configured primary navigation placement:
+// "top" (default) renders the nav as the top bar; "side" renders it as a
+// fixed left sidebar.
+func (c Config) NavigationLayout() string {
+	v := strings.ToLower(strings.TrimSpace(c.App.Navigation))
+	if v != "top" && v != "side" {
+		return DefaultNavigation
+	}
+	return v
+}
+
+// CopilotConfig holds GitHub Copilot credit tracking settings.
+type CopilotConfig struct {
+	Enabled       bool   `toml:"enabled"`
+	FetchInterval string `toml:"fetch_interval"`
+	GHPath        string `toml:"gh_path"`
+	DailyLimit    int    `toml:"daily_limit"`
 }
 
 // Duration helpers after parsing.
@@ -90,6 +116,44 @@ func (c Config) ActivityMode() string {
 		return DefaultActivityMode
 	}
 	return strings.ToLower(strings.TrimSpace(c.Activity.Mode))
+}
+
+// Location returns the configured timezone as a *time.Location. The empty
+// string and "local" resolve to time.Local. Call after Validate so the
+// timezone is guaranteed loadable; a parse failure falls back to time.Local.
+func (c Config) Location() *time.Location {
+	if c.App.Timezone != "" && c.App.Timezone != "local" {
+		if loc, err := time.LoadLocation(c.App.Timezone); err == nil {
+			return loc
+		}
+	}
+	return time.Local
+}
+
+// CopilotEnabled reports whether the hourly Copilot credit fetcher runs.
+func (c Config) CopilotEnabled() bool {
+	return c.Copilot.Enabled
+}
+
+// CopilotInterval returns the interval between Copilot credit fetches.
+func (c Config) CopilotInterval() time.Duration {
+	return parseDuration(c.Copilot.FetchInterval, DefaultCopilotFetchInterval)
+}
+
+// CopilotGHPath returns the path to the gh binary, defaulting to "gh".
+func (c Config) CopilotGHPath() string {
+	if p := strings.TrimSpace(c.Copilot.GHPath); p != "" {
+		return p
+	}
+	return "gh"
+}
+
+// CopilotDailyLimit returns the per-day credit consumption threshold that
+// triggers a desktop notification. A value of 0 disables notifications.
+// Validate rejects negative values, so callers that run Validate first can
+// treat the result as non-negative.
+func (c Config) CopilotDailyLimit() int {
+	return c.Copilot.DailyLimit
 }
 
 // TodayWeekdays returns the weekdays shown in the Today view week chart.
@@ -156,7 +220,14 @@ func Load(path string) (Config, error) {
 		App: AppConfig{
 			Timezone:      DefaultTimezone,
 			Language:      DefaultLanguage,
+			Navigation:    DefaultNavigation,
 			TodayWeekdays: append([]string(nil), defaultTodayWeekdays...),
+		},
+		Copilot: CopilotConfig{
+			Enabled:       DefaultCopilotEnabled,
+			FetchInterval: DefaultCopilotFetchInterval.String(),
+			GHPath:        "gh",
+			DailyLimit:    DefaultCopilotDailyLimit,
 		},
 	}
 
@@ -230,6 +301,15 @@ func (c Config) Validate() error {
 	}
 	if c.App.Language != "" && c.App.Language != "de" && c.App.Language != "en" {
 		return fmt.Errorf("invalid language %q: must be 'de' or 'en'", c.App.Language)
+	}
+	if c.App.Navigation != "" && c.App.Navigation != "top" && c.App.Navigation != "side" {
+		return fmt.Errorf("invalid navigation %q: must be 'top' or 'side'", c.App.Navigation)
+	}
+	if c.CopilotInterval() <= 0 {
+		return fmt.Errorf("copilot.fetch_interval must be positive")
+	}
+	if c.Copilot.DailyLimit < 0 {
+		return fmt.Errorf("copilot.daily_limit must not be negative")
 	}
 	if c.App.TodayWeekdays != nil && len(c.App.TodayWeekdays) == 0 {
 		return fmt.Errorf("today_weekdays must contain at least one valid weekday")

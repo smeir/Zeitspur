@@ -76,3 +76,37 @@ func TestMonthYear(t *testing.T) {
 		t.Errorf("MonthYear(en) = %q, want June 2026", got)
 	}
 }
+
+func TestCatalog_ErrorLabel(t *testing.T) {
+	cat := NewCatalog()
+	if got := cat.ErrorLabel(German, "unavailable"); !strings.Contains(got, "GitHub") {
+		t.Errorf("German unavailable label = %q, want it to mention GitHub", got)
+	}
+	if got := cat.ErrorLabel(English, "gh_missing"); !strings.Contains(got, "gh") {
+		t.Errorf("English gh_missing label = %q, want it to mention gh", got)
+	}
+	// Unknown and empty kinds fall back to the generic message.
+	fallback := cat.T(German, "CopilotErrorUnknown")
+	if got := cat.ErrorLabel(German, "does_not_exist"); got != fallback {
+		t.Errorf("unknown kind = %q, want fallback %q", got, fallback)
+	}
+	if got := cat.ErrorLabel(German, ""); got != fallback {
+		t.Errorf("empty kind = %q, want fallback %q", got, fallback)
+	}
+}
+
+// TestCatalog_LocaleParity guards against half-translated additions: every key
+// must exist in both locales, otherwise the UI silently falls back.
+func TestCatalog_LocaleParity(t *testing.T) {
+	cat := NewCatalog()
+	for key := range cat[German] {
+		if _, ok := cat[English][key]; !ok {
+			t.Errorf("key %q missing in English catalog", key)
+		}
+	}
+	for key := range cat[English] {
+		if _, ok := cat[German][key]; !ok {
+			t.Errorf("key %q missing in German catalog", key)
+		}
+	}
+}

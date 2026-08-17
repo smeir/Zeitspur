@@ -57,6 +57,12 @@ flowchart TB
     reconciler[Reconciler]
   end
 
+  subgraph copilot[internal/copilot]
+    cprovider[CreditProvider]
+    fetcher[Fetcher]
+    crepo[Repository]
+  end
+
   subgraph domain[Domain]
     booking[booking.Repository]
     closure[closure.Repository]
@@ -80,6 +86,7 @@ flowchart TB
   end
 
   main --> engine
+  main --> copilot
   main --> web
   main --> config
   main --> db
@@ -89,6 +96,12 @@ flowchart TB
   engine --> reconciler
   engine --> clock
   engine --> db
+
+  copilot --> cprovider
+  copilot --> fetcher
+  copilot --> crepo
+  fetcher --> clock
+  crepo --> db
 
   web --> handlers
   handlers --> booking
@@ -107,7 +120,7 @@ flowchart TB
 
 The codebase keeps three layers distinct:
 
-1. **Capture (`internal/activity`)** polls the `ActivityProvider` and writes raw events.
+1. **Capture (`internal/activity`, `internal/copilot`)** polls external state — local activity via D-Bus and GitHub Copilot credits via `gh` — and writes raw rows.
 2. **Domain (`booking`, `closure`, `timeline`)** reads raw events and derived blocks and implements business rules.
 3. **Presentation (`web`)** renders HTML and handles form posts; it never contains capture or calculation logic.
 
@@ -180,6 +193,48 @@ The reconciler (`internal/activity/reconcile.go`) computes `work_blocks` from th
 - Ignored detected blocks are subtracted from newly computed detected blocks; if the user ignores the currently open block, later active ticks extend that ignored block instead of recreating it as active.
 
 All state names are defined in `internal/activity/types.go`.
+
+## Copilot Credit Tracking
+
+```mermaid
+flowchart LR
+  gh[gh CLI] -->|gh api copilot_internal/user| provider[CreditProvider]
+  provider --> fetcher[Fetcher]
+  fetcher -->|every fetch_interval| repo[Repository]
+  fetcher -->|after store| alerter[Alerter]
+  repo --> db[(copilot_snapshots)]
+  alerter --> state[(copilot_state)]
+  alerter --> notify[Desktop Notification]
+  web[/copilot] --> repo
+```
+
+`internal/copilot` is a second capture layer alongside `internal/activity`. A `Fetcher` polls a `CreditProvider` on a ticker (default hourly) and persists each result as a `copilot_snapshots` row. The default `GHCLIProvider` shells out to `gh api copilot_internal/user`, relying on the user's existing `gh auth login` credentials — Zeitspur stores no token. A failed fetch still records an `ok=0` row with the error message so the UI can surface it, and repeated identical failures are logged once on transition to avoid spamming the journal.
+
+### Fetch error classification
+
+A failed fetch is classified into a stable `ErrorKind` (`internal/copilot/fetcherror.go`) instead of surfacing gh's raw stderr. `classifyGHError` inspects the process error and the `(HTTP nnn)` marker gh appends to API failures:
+
+| Kind | Trigger | Transient |
+| --- | --- | --- |
+| `unavailable` | HTTP 5xx (GitHub outage) | yes |
+| `rate_limited` | HTTP 429, or 403 mentioning a rate limit | yes |
+| `network` | transport errors, cancelled/timed-out context | yes |
+| `auth` | HTTP 401, gh exit code 4, "gh auth login" hints | no |
+| `forbidden` | HTTP 403 (token scopes, SAML/SSO) | no |
+| `no_seat` | HTTP 404 (no Copilot access) | no |
+| `gh_missing` | gh binary not found or not executable | no |
+| `parse` | response without a `premium_interactions` quota | no |
+| `unknown` | anything else | no |
+
+The kind is stored in `copilot_snapshots.error_kind` and translated at render time (`i18n.Catalog.ErrorLabel`), while `error_message` keeps a stable English sentence plus the trimmed upstream detail (HTML error pages are dropped, text is capped at 200 runes). The `/copilot` status card renders transient kinds as a neutral info box — they resolve on their own at the next fetch — and local problems as a warning that names the required action.
+
+The provider is abstracted behind the `CreditProvider` interface so tests use a `MockProvider`; a future direct-HTTP provider could be added without touching the fetcher.
+
+The `/copilot` dashboard reads the latest snapshot for the status card and aggregates consumption per day/week/month. Consumption between two consecutive successful snapshots is the positive delta of `used_credits`; a negative delta (quota reset or entitlement change) means the new period's `used_credits` counts instead. Each delta is attributed to the day of its later snapshot in the configured timezone. A predecessor snapshot just before the range anchors the first in-range delta so no data is lost at the boundary.
+
+### Daily-limit notifications
+
+After each successful snapshot the `Fetcher` invokes an optional `Alerter`. The alerter sums the current day's consumption (since local midnight) and, when it reaches `copilot.daily_limit` (default 2500, `0` disables), fires a desktop notification via the freedesktop D-Bus `org.freedesktop.Notifications` interface — the same session bus the activity providers use, so no `notify-send` binary is required. A per-day debounce is persisted in the single-row `copilot_state` table so the daemon does not re-notify on the next hourly fetch or after a restart; the next calendar day is eligible again. The notification text is built in the `cmd` layer (the capture package must not import `i18n`) and localized to the configured language.
 
 ## Timeline And Booking Flow
 
@@ -342,6 +397,30 @@ erDiagram
     TEXT reason
     TEXT occurred_at
   }
+
+  copilot_snapshots {
+    INTEGER id PK
+    TEXT fetched_at
+    INTEGER ok
+    TEXT plan
+    TEXT organizations
+    REAL entitlement_credits
+    REAL remaining_credits
+    REAL used_credits
+    REAL percent_remaining
+    TEXT reset_at
+    INTEGER token_based_billing
+    TEXT warning_level
+    TEXT error_message
+    TEXT error_kind
+    TEXT created_at
+  }
+
+  copilot_state {
+    INTEGER id PK "CHECK(id=1)"
+    TEXT last_notify_date
+    TEXT updated_at
+  }
 ```
 
 Schema details:
@@ -378,7 +457,12 @@ Configuration is loaded from `~/.config/zeitspur/config.toml`:
 | `server` | `listen_address` | `127.0.0.1:8787` | Web UI bind address. |
 | `app` | `timezone` | `local` | `local` or an IANA timezone. |
 | `app` | `language` | `de` | UI language: `de` or `en`. |
+| `app` | `navigation` | `top` | Primary navigation placement: `top` (horizontal menu bar) or `side` (fixed left sidebar). |
 | `app` | `today_weekdays` | `["mon", "tue", "wed", "thu", "fri"]` | Days shown in the Today view week chart. |
+| `copilot` | `enabled` | `true` | Whether the hourly Copilot credit fetcher runs. |
+| `copilot` | `fetch_interval` | `1h` | Interval between `gh api copilot_internal/user` calls. |
+| `copilot` | `gh_path` | `gh` | Path to the `gh` binary; override only if not on `PATH`. |
+| `copilot` | `daily_limit` | `2500` | Credits consumed per day at which a desktop notification fires. `0` disables notifications. |
 
 `internal/config/config.go` loads TOML via `github.com/BurntSushi/toml`, provides defaults, and validates values. `internal/systemd/systemd.go` installs a user unit that waits for `graphical-session.target`, runs the binary from `~/.local/bin/zeitspur`, and uses `NoNewPrivileges=true` and `PrivateTmp=true`.
 
@@ -397,6 +481,8 @@ Only these high-level state transitions with timestamps are persisted:
 ```text
 active, idle, locked, unlocked, suspend, resume, provider_error
 ```
+
+The Copilot credit tracker stores only high-level quota numbers returned by `gh api copilot_internal/user` — plan, organization logins, entitlement/remaining/used credits, percent remaining, reset date, and billing mode. It **never** stores prompts, completions, model names, repository names, or any content sent to or received from Copilot.
 
 Any change that would capture finer-grained data must be rejected or explicitly confirmed with the user. The privacy model takes precedence over features.
 

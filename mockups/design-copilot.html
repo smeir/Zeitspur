@@ -1,0 +1,493 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Zeitspur — Copilot-Dashboard (Mockup)</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #f7f7fb;
+    --bg-soft: #eef0f7;
+    --surface: #ffffff;
+    --surface-2: #fafbff;
+    --fg: #1a1d2e;
+    --fg-soft: #4a4f6a;
+    --muted: #8a8fa8;
+    --border: #e8eaf2;
+    --border-strong: #d9dceb;
+    --accent: #6366f1;
+    --accent-soft: #eef0ff;
+    --accent-strong: #4f46e5;
+    --success: #16a34a;
+    --success-soft: #dcfce7;
+    --danger: #e11d48;
+    --danger-soft: #ffe4e6;
+    --warning: #d97706;
+    --warning-soft: #fef3c7;
+    --shadow-sm: 0 1px 2px rgba(20,23,46,0.04), 0 1px 3px rgba(20,23,46,0.04);
+    --shadow: 0 4px 16px rgba(20,23,46,0.06), 0 1px 3px rgba(20,23,46,0.04);
+    --radius: 16px;
+    --radius-sm: 10px;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    font-family: 'Inter', system-ui, -apple-system, sans-serif;
+    background: var(--bg);
+    color: var(--fg);
+    line-height: 1.55;
+    -webkit-font-smoothing: antialiased;
+    font-feature-settings: "cv02","cv03","cv04","cv11";
+  }
+
+  .app { display: grid; grid-template-columns: 248px 1fr; min-height: 100vh; }
+
+  /* ---------- Sidebar (mirrors design-a-aurora) ---------- */
+  .sidebar {
+    background: var(--surface);
+    border-right: 1px solid var(--border);
+    padding: 24px 16px;
+    display: flex; flex-direction: column; gap: 8px;
+    position: sticky; top: 0; height: 100vh;
+  }
+  .brand { display: flex; align-items: center; gap: 12px; padding: 8px 12px 20px; }
+  .brand-mark {
+    width: 38px; height: 38px; border-radius: 11px;
+    background: linear-gradient(135deg, #6366f1, #8b5cf6);
+    display: grid; place-items: center;
+    box-shadow: 0 6px 16px rgba(99,102,241,0.35);
+  }
+  .brand-mark svg { width: 22px; height: 22px; color: #fff; }
+  .brand-name { font-size: 1.05rem; font-weight: 700; letter-spacing: -0.01em; }
+  .brand-sub { font-size: 0.72rem; color: var(--muted); font-weight: 500; }
+
+  .nav-label { font-size: 0.68rem; text-transform: uppercase; letter-spacing: 0.08em; color: var(--muted); font-weight: 600; padding: 16px 12px 6px; }
+  .nav-item {
+    display: flex; align-items: center; gap: 12px; padding: 10px 12px; border-radius: var(--radius-sm);
+    color: var(--fg-soft); text-decoration: none; font-size: 0.92rem; font-weight: 500; transition: background .15s, color .15s;
+  }
+  .nav-item svg { width: 19px; height: 19px; flex-shrink: 0; }
+  .nav-item:hover { background: var(--bg-soft); color: var(--fg); }
+  .nav-item.active { background: var(--accent-soft); color: var(--accent-strong); font-weight: 600; }
+  .nav-item.active svg { color: var(--accent); }
+
+  .sidebar-foot { margin-top: auto; padding: 12px; border-top: 1px solid var(--border); display: flex; align-items: center; gap: 10px; }
+  .avatar { width: 34px; height: 34px; border-radius: 50%; background: var(--bg-soft); display: grid; place-items: center; font-weight: 700; font-size: 0.8rem; color: var(--fg-soft); }
+  .avatar-meta { font-size: 0.78rem; }
+  .avatar-meta b { display: block; font-weight: 600; }
+  .avatar-meta span { color: var(--muted); font-size: 0.72rem; }
+
+  /* ---------- Main ---------- */
+  .main { padding: 36px 44px 64px; max-width: 1180px; }
+
+  .page-head { display: flex; justify-content: space-between; align-items: flex-end; margin-bottom: 24px; gap: 16px; flex-wrap: wrap; }
+  .page-head h1 { font-size: 1.7rem; font-weight: 700; letter-spacing: -0.02em; }
+  .page-head .date { color: var(--muted); font-size: 0.92rem; font-weight: 500; margin-top: 2px; }
+  .page-actions { display: flex; gap: 10px; }
+
+  /* ---------- Cards ---------- */
+  .card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 22px 24px; box-shadow: var(--shadow-sm); margin-bottom: 20px; }
+  .card-head { display: flex; justify-content: space-between; align-items: center; gap: 12px; margin-bottom: 18px; flex-wrap: wrap; }
+  .card-head h2 { font-size: 1.12rem; font-weight: 700; letter-spacing: -0.01em; display: flex; align-items: center; gap: 9px; }
+  .card-head h2 svg { width: 18px; height: 18px; color: var(--accent); }
+  .card-head .sub { color: var(--muted); font-size: 0.85rem; }
+
+  /* ---------- Hero (quota) ---------- */
+  .hero { display: grid; grid-template-columns: 200px 1fr; gap: 28px; align-items: center; }
+  .ring-wrap { position: relative; width: 200px; height: 200px; margin: 0 auto; }
+  .ring-wrap svg { transform: rotate(-90deg); }
+  .ring-track { fill: none; stroke: var(--bg-soft); stroke-width: 16; }
+  .ring-used { fill: none; stroke: url(#ringGrad); stroke-width: 16; stroke-linecap: round; transition: stroke-dashoffset .6s ease; }
+  .ring-center { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; }
+  .ring-pct { font-size: 2.1rem; font-weight: 800; letter-spacing: -0.03em; font-variant-numeric: tabular-nums; }
+  .ring-label { font-size: 0.78rem; color: var(--muted); font-weight: 600; text-transform: uppercase; letter-spacing: 0.06em; }
+  .ring-badge { margin-top: 8px; font-size: 0.74rem; font-weight: 700; padding: 3px 10px; border-radius: 999px; background: var(--success-soft); color: #15803d; }
+
+  .hero-meta { display: flex; flex-direction: column; gap: 16px; }
+  .hero-plan { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+  .plan-tag { display: inline-flex; align-items: center; gap: 7px; padding: 5px 12px; border-radius: 999px; font-size: 0.82rem; font-weight: 600; background: var(--accent-soft); color: var(--accent-strong); }
+  .org-tag { font-size: 0.82rem; color: var(--fg-soft); }
+  .hero-stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; }
+  .hero-stat { background: var(--surface-2); border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 12px 14px; }
+  .hero-stat .k { font-size: 0.74rem; color: var(--muted); font-weight: 600; }
+  .hero-stat .v { font-size: 1.35rem; font-weight: 700; letter-spacing: -0.02em; margin-top: 3px; font-variant-numeric: tabular-nums; }
+  .hero-stat .v small { font-size: 0.8rem; font-weight: 500; color: var(--muted); }
+  .reset-row { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; color: var(--fg-soft); font-size: 0.88rem; }
+  .reset-row b { color: var(--fg); font-variant-numeric: tabular-nums; }
+  .reset-chip { display: inline-flex; align-items: center; gap: 6px; padding: 4px 10px; border-radius: 8px; background: var(--warning-soft); color: #b45309; font-weight: 600; font-size: 0.8rem; }
+  .reset-chip svg { width: 14px; height: 14px; }
+  .reset-bar { flex: 1 1 160px; height: 8px; background: var(--bg-soft); border-radius: 4px; overflow: hidden; }
+  .reset-bar i { display: block; height: 100%; background: linear-gradient(90deg, #fbbf24, #f59e0b); border-radius: 4px; }
+
+  /* ---------- KPI row ---------- */
+  .stats { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; margin-bottom: 20px; }
+  .stat { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 18px 20px; box-shadow: var(--shadow-sm); }
+  .stat-label { font-size: 0.78rem; color: var(--muted); font-weight: 600; display: flex; align-items: center; gap: 8px; }
+  .stat-label svg { width: 15px; height: 15px; }
+  .stat-value { font-size: 1.7rem; font-weight: 700; letter-spacing: -0.02em; margin-top: 8px; font-variant-numeric: tabular-nums; }
+  .stat-value small { font-size: 0.85rem; font-weight: 500; color: var(--muted); }
+  .stat-foot { font-size: 0.78rem; color: var(--muted); margin-top: 6px; display: flex; align-items: center; gap: 6px; }
+  .trend-up { color: var(--danger); font-weight: 600; }
+  .trend-down { color: var(--success); font-weight: 600; }
+
+  /* ---------- Segmented period control ---------- */
+  .seg { display: inline-flex; background: var(--bg-soft); border-radius: 10px; padding: 4px; gap: 2px; }
+  .seg a { padding: 7px 16px; border-radius: 8px; font-size: 0.86rem; font-weight: 600; color: var(--fg-soft); text-decoration: none; transition: all .15s; }
+  .seg a:hover { color: var(--fg); }
+  .seg a.active { background: var(--surface); color: var(--accent-strong); box-shadow: var(--shadow-sm); }
+
+  .period-label { font-size: 0.95rem; font-weight: 600; color: var(--fg); }
+  .period-sub { font-size: 0.8rem; color: var(--muted); }
+
+  /* ---------- Buttons ---------- */
+  .btn { display: inline-flex; align-items: center; gap: 7px; padding: 9px 16px; border-radius: var(--radius-sm); border: 1px solid transparent; font: inherit; font-size: 0.88rem; font-weight: 600; cursor: pointer; text-decoration: none; transition: all .15s; }
+  .btn svg { width: 16px; height: 16px; }
+  .btn-ghost { background: var(--surface); border-color: var(--border-strong); color: var(--fg-soft); }
+  .btn-ghost:hover { background: var(--bg-soft); color: var(--fg); }
+  .btn-sm { padding: 6px 11px; font-size: 0.8rem; border-radius: 8px; }
+  .btn-icon { padding: 7px 9px; }
+
+  /* ---------- Bar chart ---------- */
+  .chart-scroll { overflow-x: auto; padding-bottom: 4px; }
+  .chart { height: 260px; display: flex; align-items: flex-end; gap: 6px; padding: 8px 4px 0; border-bottom: 1px solid var(--border); position: relative; min-width: 560px; }
+  .bar-col { flex: 1 1 0; display: flex; flex-direction: column; align-items: center; justify-content: flex-end; height: 100%; min-width: 0; position: relative; }
+  .bar-wrap { width: 100%; max-width: 34px; height: 100%; display: flex; flex-direction: column; align-items: center; justify-content: flex-end; position: relative; }
+  .bar { width: 100%; border-radius: 6px 6px 3px 3px; background: linear-gradient(180deg, #818cf8, #6366f1); transition: filter .15s; min-height: 2px; }
+  .bar-col:hover .bar { filter: brightness(1.08); }
+  .bar-wrap.future .bar { background: var(--bg-soft); border: 1px dashed var(--border-strong); min-height: 4px; }
+  .bar-wrap.today .bar { background: linear-gradient(180deg, #34d399, #16a34a); box-shadow: 0 0 0 3px rgba(22,163,74,0.18); }
+  .bar-val { position: absolute; top: -20px; font-size: 0.7rem; font-weight: 700; color: var(--fg); font-variant-numeric: tabular-nums; white-space: nowrap; opacity: 0; transition: opacity .15s; }
+  .bar-col:hover .bar-val, .bar-wrap.today .bar-val { opacity: 1; }
+  .bar-today-flag { position: absolute; top: -38px; font-size: 0.64rem; font-weight: 700; color: var(--success); background: var(--success-soft); padding: 2px 7px; border-radius: 5px; white-space: nowrap; }
+  .x-axis { display: flex; gap: 6px; padding: 8px 4px 0; min-width: 560px; }
+  .x-tick { flex: 1 1 0; text-align: center; font-size: 0.68rem; color: var(--muted); font-variant-numeric: tabular-nums; min-width: 0; overflow: hidden; }
+  .x-tick.muted { opacity: .5; }
+  .chart-legend { display: flex; gap: 18px; margin-top: 16px; font-size: 0.78rem; color: var(--muted); flex-wrap: wrap; }
+  .chart-legend span { display: inline-flex; align-items: center; gap: 6px; }
+  .chart-legend i { width: 11px; height: 11px; border-radius: 4px; display: inline-block; }
+  .i-used { background: linear-gradient(180deg, #818cf8, #6366f1); }
+  .i-today { background: linear-gradient(180deg, #34d399, #16a34a); }
+  .i-future { background: var(--bg-soft); border: 1px dashed var(--border-strong); }
+
+  /* ---------- Heatmap ---------- */
+  .heatmap-scroll { overflow-x: auto; padding-bottom: 4px; }
+  .heatmap { display: grid; grid-template-columns: 28px repeat(7, 1fr); gap: 5px; min-width: 560px; }
+  .hm-row-label { font-size: 0.68rem; color: var(--muted); font-weight: 600; align-self: center; }
+  .hm-dow { font-size: 0.68rem; color: var(--muted); font-weight: 600; text-align: center; padding-bottom: 2px; }
+  .hm-cell { aspect-ratio: 1 / 1; border-radius: 6px; background: var(--bg-soft); border: 1px solid var(--border); display: flex; align-items: center; justify-content: center; font-size: 0.66rem; color: var(--muted); font-variant-numeric: tabular-nums; }
+  .hm-cell.l1 { background: #c7d2fe; border-color: #c7d2fe; color: #3730a3; }
+  .hm-cell.l2 { background: #a5b4fc; border-color: #a5b4fc; color: #1e1b4b; }
+  .hm-cell.l3 { background: #818cf8; border-color: #818cf8; color: #fff; }
+  .hm-cell.l4 { background: #6366f1; border-color: #6366f1; color: #fff; }
+  .hm-cell.future { opacity: .55; }
+  .hm-cell.today { outline: 2px solid var(--success); outline-offset: 1px; }
+  .hm-cell.empty { background: transparent; border-color: transparent; }
+  .hm-legend { display: flex; align-items: center; gap: 8px; margin-top: 14px; font-size: 0.76rem; color: var(--muted); }
+  .hm-legend .scale { display: inline-flex; gap: 3px; }
+  .hm-legend .scale i { width: 14px; height: 14px; border-radius: 4px; }
+
+  @media (max-width: 920px) {
+    .app { grid-template-columns: 1fr; }
+    .sidebar { display: none; }
+    .stats { grid-template-columns: repeat(2, 1fr); }
+    .hero { grid-template-columns: 1fr; }
+    .main { padding: 24px 18px; }
+  }
+</style>
+</head>
+<body>
+<div class="app">
+
+  <!-- Sidebar -->
+  <aside class="sidebar">
+    <div class="brand">
+      <div class="brand-mark">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>
+      </div>
+      <div>
+        <div class="brand-name">Zeitspur</div>
+        <div class="brand-sub">Arbeitszeit · lokal</div>
+      </div>
+    </div>
+
+    <div class="nav-label">Ansicht</div>
+    <a class="nav-item" href="#"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>Heute</a>
+    <a class="nav-item" href="#"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="17" rx="2"/><path d="M3 9h18M8 2v4M16 2v4"/></svg>Woche</a>
+    <a class="nav-item" href="#"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="17" rx="2"/><path d="M3 9h18M8 2v4M16 2v4M8 14h3M8 18h6"/></svg>Monat</a>
+
+    <div class="nav-label">Verwaltung</div>
+    <a class="nav-item" href="#"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 11l3 3 8-8"/><path d="M20 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>Buchung</a>
+    <a class="nav-item" href="#"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19V5a2 2 0 0 1 2-2h12a2 2 0 0 1 2 2v14l-4-2-4 2-4-2-4 2z"/></svg>Abschlüsse</a>
+    <a class="nav-item active" href="#"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2a4 4 0 0 1 4 4v1h1a3 3 0 0 1 3 3v2a3 3 0 0 1-3 3h-1v1a4 4 0 0 1-4 4 4 4 0 0 1-4-4v-1H7a3 3 0 0 1-3-3v-2a3 3 0 0 1 3-3h1V6a4 4 0 0 1 4-4z"/><path d="M12 9v6M9 12h6"/></svg>Copilot</a>
+    <a class="nav-item" href="#"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>Einstellungen</a>
+
+    <div class="sidebar-foot">
+      <div class="avatar">SM</div>
+      <div class="avatar-meta"><b>Lokal</b><span>127.0.0.1:8787</span></div>
+    </div>
+  </aside>
+
+  <!-- Main -->
+  <main class="main">
+
+    <!-- Page head -->
+    <div class="page-head">
+      <div>
+        <h1>Copilot</h1>
+        <div class="date">GitHub Copilot · Kredit-Verbrauch</div>
+      </div>
+      <div class="page-actions">
+        <a class="btn btn-ghost btn-sm" href="#"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a9 9 0 1 1-3-6.7L21 8"/><path d="M21 3v5h-5"/></svg>Aktualisieren</a>
+        <a class="btn btn-ghost btn-icon" href="#" title="Zurück"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6"/></svg></a>
+        <a class="btn btn-ghost btn-icon" href="#" title="Heute"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg></a>
+        <a class="btn btn-ghost btn-icon" href="#" title="Weiter"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18l6-6-6-6"/></svg></a>
+      </div>
+    </div>
+
+    <!-- Hero: current quota -->
+    <div class="card">
+      <div class="card-head">
+        <h2><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2a4 4 0 0 1 4 4v1h1a3 3 0 0 1 3 3v2a3 3 0 0 1-3 3h-1v1a4 4 0 0 1-4 4 4 4 0 0 1-4-4v-1H7a3 3 0 0 1-3-3v-2a3 3 0 0 1 3-3h1V6a4 4 0 0 1 4-4z"/></svg>Kontingent-Status</h2>
+        <span class="sub">Aktualisiert vor 12 min · nächste Abfrage 14:00 Uhr</span>
+      </div>
+      <div class="hero">
+        <!-- Donut ring: used 55.7% of 300 credits -->
+        <div class="ring-wrap">
+          <svg width="200" height="200" viewBox="0 0 200 200">
+            <defs>
+              <linearGradient id="ringGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+                <stop offset="0%" stop-color="#818cf8"/>
+                <stop offset="100%" stop-color="#6366f1"/>
+              </linearGradient>
+            </defs>
+            <circle class="ring-track" cx="100" cy="100" r="82"/>
+            <circle class="ring-used" cx="100" cy="100" r="82"
+                    stroke-dasharray="515.2" stroke-dashoffset="228.3"/>
+          </svg>
+          <div class="ring-center">
+            <div class="ring-pct">55,7%</div>
+            <div class="ring-label">verbraucht</div>
+            <div class="ring-badge">OK</div>
+          </div>
+        </div>
+        <div class="hero-meta">
+          <div class="hero-plan">
+            <span class="plan-tag"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:14px;height:14px"><path d="M12 2l2.4 7.4H22l-6 4.6 2.3 7.4L12 16.8 5.7 21.4 8 14l-6-4.6h7.6z"/></svg>Business</span>
+            <span class="org-tag">Organisation: <strong>acme-corp</strong></span>
+          </div>
+          <div class="hero-stats">
+            <div class="hero-stat">
+              <div class="k">Kontingent</div>
+              <div class="v">300<small> Kredite</small></div>
+            </div>
+            <div class="hero-stat">
+              <div class="k">Verbraucht</div>
+              <div class="v">167<small> Kredite</small></div>
+            </div>
+            <div class="hero-stat">
+              <div class="k">Verbleibend</div>
+              <div class="v">133<small> Kredite</small></div>
+            </div>
+          </div>
+          <div class="reset-row">
+            <span class="reset-chip"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a9 9 0 1 1-3-6.7L21 8"/><path d="M21 3v5h-5"/></svg>Reset in 12 Tagen</span>
+            <span>Zurücksetzung am <b>30.06.2026</b></span>
+            <div class="reset-bar"><i style="width:60%"></i></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- KPI row -->
+    <div class="stats">
+      <div class="stat">
+        <div class="stat-label"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 7h8M8 12h8M8 17h5"/><rect x="3" y="3" width="18" height="18" rx="2"/></svg>Verbrauch heute</div>
+        <div class="stat-value">12,4</div>
+        <div class="stat-foot">Do, 18.06. · <span class="trend-up">↑ 27%</span> ggü. Vortag</div>
+      </div>
+      <div class="stat">
+        <div class="stat-label"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3v18h18"/><path d="M7 14l4-4 3 3 5-6"/></svg>Ø pro Arbeitstag</div>
+        <div class="stat-value">11,9</div>
+        <div class="stat-foot">Ø über 14 Arbeitstage im Juni</div>
+      </div>
+      <div class="stat">
+        <div class="stat-label"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="17" rx="2"/><path d="M3 9h18M8 2v4M16 2v4"/></svg>Diese Woche (KW 25)</div>
+        <div class="stat-value">39,8</div>
+        <div class="stat-foot">15. – 18.06. (4 Tage)</div>
+      </div>
+      <div class="stat">
+        <div class="stat-label"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="17" rx="2"/><path d="M3 9h18M8 2v4M16 2v4M8 14h3M8 18h6"/></svg>Diesen Monat</div>
+        <div class="stat-value">166,9 <small>/ 300</small></div>
+        <div class="stat-foot">55,7% des Kontingents</div>
+      </div>
+    </div>
+
+    <!-- Period selector + bar chart -->
+    <div class="card">
+      <div class="card-head">
+        <h2><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3v18h18"/><path d="M7 14l4-4 3 3 5-6"/></svg>Verbrauch pro Tag</h2>
+        <div class="seg">
+          <a href="#">Tag</a>
+          <a href="#">Woche</a>
+          <a class="active" href="#">Monat</a>
+        </div>
+      </div>
+      <div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:14px">
+        <span class="period-label">Juni 2026</span>
+        <span class="period-sub">01.06. – 30.06. · 22 Arbeitstage</span>
+      </div>
+
+      <!-- Bars rendered by script from .ConsumptionDays-like data -->
+      <div class="chart-scroll">
+        <div class="chart" id="chart"></div>
+        <div class="x-axis" id="xaxis"></div>
+      </div>
+      <div class="chart-legend">
+        <span><i class="i-used"></i>Verbrauch</span>
+        <span><i class="i-today"></i>Heute</span>
+        <span><i class="i-future"></i>Zukunft (leer)</span>
+      </div>
+    </div>
+
+    <!-- Month heatmap -->
+    <div class="card">
+      <div class="card-head">
+        <h2><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="3"/><path d="M9 3v18M15 3v18M3 9h18M3 15h18"/></svg>Monatsübersicht</h2>
+        <span class="sub">Verbrauchsintensität pro Kalendertag</span>
+      </div>
+      <div class="heatmap-scroll">
+        <div class="heatmap" id="heatmap"></div>
+      </div>
+      <div class="hm-legend">
+        <span>weniger</span>
+        <span class="scale">
+          <i style="background:var(--bg-soft);border:1px solid var(--border)"></i>
+          <i style="background:#c7d2fe"></i>
+          <i style="background:#a5b4fc"></i>
+          <i style="background:#818cf8"></i>
+          <i style="background:#6366f1"></i>
+        </span>
+        <span>mehr</span>
+      </div>
+    </div>
+
+  </main>
+</div>
+
+<script>
+  // --- Mockup data (mirrors what handleCopilot provides via .ConsumptionDays) ---
+  // Each entry: { label, dow, consumed, today?, future? }
+  const days = [
+    { label: '01', dow: 'Mo', c: 9.2 },
+    { label: '02', dow: 'Di', c: 14.5 },
+    { label: '03', dow: 'Mi', c: 7.8 },
+    { label: '04', dow: 'Do', c: 11.3 },
+    { label: '05', dow: 'Fr', c: 16.0 },
+    { label: '08', dow: 'Mo', c: 8.4 },
+    { label: '09', dow: 'Di', c: 22.1 },
+    { label: '10', dow: 'Mi', c: 5.9 },
+    { label: '11', dow: 'Do', c: 13.7 },
+    { label: '12', dow: 'Fr', c: 18.2 },
+    { label: '15', dow: 'Mo', c: 10.5 },
+    { label: '16', dow: 'Di', c: 7.1 },
+    { label: '17', dow: 'Mi', c: 9.8 },
+    { label: '18', dow: 'Do', c: 12.4, today: true },
+    { label: '19', dow: 'Fr', c: 0, future: true },
+    { label: '22', dow: 'Mo', c: 0, future: true },
+    { label: '23', dow: 'Di', c: 0, future: true },
+    { label: '24', dow: 'Mi', c: 0, future: true },
+    { label: '25', dow: 'Do', c: 0, future: true },
+    { label: '26', dow: 'Fr', c: 0, future: true },
+    { label: '29', dow: 'Mo', c: 0, future: true },
+    { label: '30', dow: 'Di', c: 0, future: true },
+  ];
+  const max = Math.max(...days.map(d => d.c), 1);
+
+  // --- Render vertical bar chart ---
+  const chart = document.getElementById('chart');
+  const xaxis = document.getElementById('xaxis');
+  days.forEach(d => {
+    const col = document.createElement('div');
+    col.className = 'bar-col';
+    const barWrap = document.createElement('div');
+    barWrap.className = 'bar-wrap' + (d.today ? ' today' : '') + (d.future ? ' future' : '');
+    const bar = document.createElement('div');
+    bar.className = 'bar';
+    const h = d.c > 0 ? Math.max(4, (d.c / max) * 100) : 0;
+    bar.style.height = h + '%';
+    barWrap.appendChild(bar);
+    if (d.today) {
+      const flag = document.createElement('div');
+      flag.className = 'bar-today-flag';
+      flag.textContent = 'Heute';
+      barWrap.appendChild(flag);
+    }
+    const val = document.createElement('div');
+    val.className = 'bar-val';
+    val.textContent = d.c > 0 ? d.c.toFixed(1).replace('.', ',') : '';
+    barWrap.appendChild(val);
+    col.appendChild(barWrap);
+    col.title = (d.today ? 'Heute, ' : '') + d.label + '.06. · ' + (d.c > 0 ? d.c.toFixed(1) + ' Kredite' : 'kein Verbrauch');
+    chart.appendChild(col);
+
+    const tick = document.createElement('div');
+    tick.className = 'x-tick' + (d.future ? ' muted' : '');
+    tick.textContent = d.label + '.';
+    xaxis.appendChild(tick);
+  });
+
+  // --- Render month heatmap (Mon–Sun rows, June 2026 starts on Monday) ---
+  const heatmap = document.getElementById('heatmap');
+  const dowNames = ['Mo', 'Di', 'Mi', 'Do', 'Fr', 'Sa', 'So'];
+  // header row: empty corner + weekday names
+  const corner = document.createElement('div');
+  heatmap.appendChild(corner);
+  dowNames.forEach(n => {
+    const h = document.createElement('div');
+    h.className = 'hm-dow';
+    h.textContent = n;
+    heatmap.appendChild(h);
+  });
+  // build a map day -> consumed
+  const byDay = {};
+  days.forEach(d => { byDay[parseInt(d.label)] = d; });
+  const totalDays = 30;
+  function level(v) {
+    if (v <= 0) return 0;
+    if (v <= 5.5) return 1;
+    if (v <= 11) return 2;
+    if (v <= 16.5) return 3;
+    return 4;
+  }
+  // 5 weeks x 7 days = 35 cells; June 1 2026 is a Monday => no leading blanks
+  const todayDay = 18;
+  for (let i = 0; i < 35; i++) {
+    const dayNum = i + 1;
+    const rowLabel = document.createElement('div');
+    // place a row label (KW) at the start of each week
+    if (i % 7 === 0) {
+      rowLabel.className = 'hm-row-label';
+      rowLabel.textContent = 'KW ' + (23 + i / 7);
+      heatmap.appendChild(rowLabel);
+    }
+    const cell = document.createElement('div');
+    if (dayNum > totalDays) {
+      cell.className = 'hm-cell empty';
+    } else {
+      const d = byDay[dayNum] || { c: 0 };
+      let cls = 'hm-cell l' + level(d.c);
+      if (dayNum === todayDay) cls += ' today';
+      else if (dayNum > todayDay) cls += ' future';
+      cell.className = cls;
+      cell.textContent = dayNum;
+      cell.title = dayNum + '.06. · ' + (d.c > 0 ? d.c.toFixed(1) + ' Kredite' : 'kein Verbrauch');
+    }
+    heatmap.appendChild(cell);
+  }
+</script>
+</body>
+</html>

@@ -7,6 +7,7 @@ import (
 	"log/slog"
 	"net/http"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/go-chi/chi/v5"
@@ -15,6 +16,7 @@ import (
 	"github.com/smeir/zeitspur/internal/booking"
 	"github.com/smeir/zeitspur/internal/closure"
 	"github.com/smeir/zeitspur/internal/config"
+	"github.com/smeir/zeitspur/internal/copilot"
 	"github.com/smeir/zeitspur/internal/i18n"
 	"github.com/smeir/zeitspur/internal/timeline"
 	"github.com/smeir/zeitspur/internal/timeutil"
@@ -628,6 +630,379 @@ func sameInstant(a, b time.Time) bool {
 	return delta < time.Second
 }
 
+// handleCopilot renders the Copilot credit dashboard. A period switch
+// (week/month) drives the consumption chart range via ?period= and ?date=.
+// The hero card shows the latest quota snapshot as a ring; KPI cards summarize
+// today / per-day average / week / month; the bar chart shows per-day
+// consumption and, for the month period, a heatmap overlay.
+func (s *Server) handleCopilot(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+	loc := s.location()
+	now := s.clk.Now().In(loc)
+
+	repo := copilot.NewRepository(s.db)
+	latest, _ := repo.Latest(ctx)
+
+	period := periodFromQuery(r.URL.Query().Get("period"))
+
+	date := now
+	if d := r.URL.Query().Get("date"); d != "" {
+		if parsed, err := time.ParseInLocation("2006-01-02", d, loc); err == nil {
+			date = parsed
+		}
+	}
+
+	var (
+		start, end, prev, next time.Time
+	)
+	switch period {
+	case "month":
+		start = time.Date(date.Year(), date.Month(), 1, 0, 0, 0, 0, loc)
+		end = start.AddDate(0, 1, 0).Add(-time.Second)
+		prev = start.AddDate(0, -1, 0)
+		next = start.AddDate(0, 1, 0)
+	default: // week
+		start, _ = weekBounds(date)
+		end = start.AddDate(0, 0, 7).Add(-time.Second)
+		prev = start.AddDate(0, 0, -7)
+		next = start.AddDate(0, 0, 7)
+	}
+
+	consumption, _ := repo.Consumption(ctx, start, end, loc)
+	total := copilot.TotalConsumed(consumption)
+	chartDays := buildConsumptionDays(consumption, start, end, loc, now)
+
+	// KPI cards are always relative to "now", independent of the selected
+	// period, so the dashboard's headline numbers stay stable while browsing.
+	todayStart := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, loc)
+	todayEnd := todayStart.AddDate(0, 0, 1).Add(-time.Second)
+	yestStart := todayStart.AddDate(0, 0, -1)
+	yestEnd := todayStart.Add(-time.Second)
+	weekStart, _ := weekBounds(now)
+	weekEnd := weekStart.AddDate(0, 0, 7).Add(-time.Second)
+	monStart := time.Date(now.Year(), now.Month(), 1, 0, 0, 0, 0, loc)
+	monEnd := monStart.AddDate(0, 1, 0).Add(-time.Second)
+
+	todayEntries, _ := repo.Consumption(ctx, todayStart, todayEnd, loc)
+	yestEntries, _ := repo.Consumption(ctx, yestStart, yestEnd, loc)
+	weekEntries, _ := repo.Consumption(ctx, weekStart, weekEnd, loc)
+	monEntries, _ := repo.Consumption(ctx, monStart, monEnd, loc)
+
+	todayCons := sumConsumption(todayEntries)
+	yestCons := sumConsumption(yestEntries)
+	weekCons := sumConsumption(weekEntries)
+	monCons := sumConsumption(monEntries)
+	monDays := 0
+	for _, e := range monEntries {
+		if e.Consumed > 0 {
+			monDays++
+		}
+	}
+	avgPerDay := 0.0
+	if monDays > 0 {
+		avgPerDay = monCons / float64(monDays)
+	}
+	trendPct := 0.0
+	hasTrend := yestCons > 0
+	if hasTrend {
+		trendPct = (todayCons - yestCons) / yestCons * 100
+	}
+	trendAbs := trendPct
+	if trendAbs < 0 {
+		trendAbs = -trendAbs
+	}
+	monthPct := 0.0
+	if latest != nil && latest.OK && latest.EntitlementCredits > 0 {
+		monthPct = monCons / latest.EntitlementCredits * 100
+	}
+
+	data := map[string]any{
+		"Title":            "PageCopilot",
+		"Nav":              "copilot",
+		"Latest":           latest,
+		"Period":           period,
+		"HasData":          latest != nil,
+		"ChartDays":        chartDays,
+		"TotalConsumed":    total,
+		"Start":            start,
+		"End":              end,
+		"PrevDate":         prev.Format("2006-01-02"),
+		"NextDate":         next.Format("2006-01-02"),
+		"IsCurrent":        isCurrentPeriod(now, date, period, start),
+		"NextFetchAt":      s.nextFetchAt(),
+		"ConsumptionLabel": periodLabel(period, start, end, s.locale(), s.catalog),
+		"Now":              now,
+		// KPI card values
+		"TodayConsumed": todayCons,
+		"HasTrend":      hasTrend,
+		"TrendPercent":  trendPct,
+		"TrendAbs":      trendAbs,
+		"TrendUp":       trendPct >= 0,
+		"AvgPerDay":     avgPerDay,
+		"WeekConsumed":  weekCons,
+		"WeekStart":     weekStart,
+		"WeekEnd":       weekEnd,
+		"ISOWeek":       isoWeek(now),
+		"MonthConsumed": monCons,
+		"MonthDays":     monDays,
+		"MonthStart":    monStart,
+		"MonthPercent":  monthPct,
+	}
+	if period == "month" {
+		data["ShowHeatmap"] = true
+		data["HeatmapRows"] = buildHeatmap(consumption, start, loc, now)
+		data["HeatmapDow"] = heatmapDow(s.locale())
+	}
+	if latest != nil {
+		data["LatestFetchMin"] = max(0, int(now.Sub(latest.FetchedAt).Minutes()))
+		if !latest.OK {
+			data["LatestErrorLabel"] = s.catalog.ErrorLabel(s.locale(), string(latest.ErrorKind))
+			data["LatestErrorTransient"] = latest.ErrorKind.Transient()
+		}
+		usedPercent := 100 - latest.PercentRemaining
+		if usedPercent < 0 {
+			usedPercent = 0
+		}
+		if usedPercent > 100 {
+			usedPercent = 100
+		}
+		data["LatestUsedPercent"] = usedPercent
+		data["LatestWarning"] = s.catalog.WarningLabel(s.locale(), string(latest.WarningLevel))
+		// Ring geometry: radius 82 ⇒ circumference ≈ 515.22. The used arc is
+		// drawn by offsetting the dash by the remaining fraction.
+		const circ = 2 * 3.141592653589793 * 82
+		data["RingDashArray"] = circ
+		data["RingDashOffset"] = circ * (1 - usedPercent/100)
+		if !latest.ResetAt.IsZero() {
+			data["ResetDays"] = daysBetween(now, latest.ResetAt)
+			periodStart := latest.ResetAt.AddDate(0, -1, 0)
+			progress := 0.0
+			if latest.ResetAt.After(periodStart) && now.After(periodStart) {
+				progress = now.Sub(periodStart).Seconds() / latest.ResetAt.Sub(periodStart).Seconds()
+				if progress < 0 {
+					progress = 0
+				}
+				if progress > 1 {
+					progress = 1
+				}
+			}
+			data["ResetProgress"] = progress * 100
+		}
+	}
+	s.renderLayout(w, r, "copilot", data, http.StatusOK)
+}
+
+// copilotDayView is the per-day consumption row used by the Copilot dashboard.
+type copilotDayView struct {
+	Date     time.Time
+	DateStr  string
+	Consumed float64
+	BarWidth int
+	// Bar-chart enrichment: day-of-month, and flags relative to "now" so the
+	// template can highlight today and fade future days without a clock.
+	DayNum   int
+	IsToday  bool
+	IsFuture bool
+}
+
+// buildConsumptionDays lays out every calendar day in [start, end] (inclusive)
+// as a bar-chart column, looking up consumed credits from entries by date. Days
+// without data render as stubs; days after "now" are flagged future so the
+// template can dash them. The bar height is relative to the period's peak.
+func buildConsumptionDays(entries []copilot.DailyConsumption, start, end time.Time, loc *time.Location, now time.Time) []copilotDayView {
+	byDay := make(map[string]float64, len(entries))
+	var maxConsumed float64
+	for _, e := range entries {
+		byDay[e.Date.In(loc).Format("2006-01-02")] = e.Consumed
+		if e.Consumed > maxConsumed {
+			maxConsumed = e.Consumed
+		}
+	}
+	todayStr := now.Format("2006-01-02")
+	out := make([]copilotDayView, 0, 32)
+	for d := start; !d.After(end); d = d.AddDate(0, 0, 1) {
+		ds := d.Format("2006-01-02")
+		c := byDay[ds]
+		bar := 0
+		if maxConsumed > 0 && c > 0 {
+			bar = int((c / maxConsumed) * 100)
+			if bar < 4 {
+				bar = 4
+			}
+		}
+		t := d.In(loc)
+		out = append(out, copilotDayView{
+			Date:     t,
+			DateStr:  ds,
+			Consumed: c,
+			BarWidth: bar,
+			DayNum:   t.Day(),
+			IsToday:  ds == todayStr,
+			IsFuture: t.After(now) && ds != todayStr,
+		})
+	}
+	return out
+}
+
+// copilotHeatCell is a single cell in the month heatmap.
+type copilotHeatCell struct {
+	Empty    bool
+	DayNum   int
+	Level    int // 0 (none) .. 4 (peak)
+	Consumed float64
+	DateStr  string
+	IsToday  bool
+	IsFuture bool
+}
+
+// copilotHeatRow is one calendar week (Monday-first) of the heatmap, plus the
+// ISO week number used as the row label.
+type copilotHeatRow struct {
+	WeekNum int
+	Cells   []copilotHeatCell
+}
+
+// buildHeatmap lays out a full month as Monday-first weeks with leading and
+// trailing padding, classifying each day's consumption into 5 intensity levels
+// relative to the month's peak.
+func buildHeatmap(entries []copilot.DailyConsumption, monthStart time.Time, loc *time.Location, now time.Time) []copilotHeatRow {
+	byDay := make(map[string]float64, len(entries))
+	var maxConsumed float64
+	for _, e := range entries {
+		byDay[e.Date.In(loc).Format("2006-01-02")] = e.Consumed
+		if e.Consumed > maxConsumed {
+			maxConsumed = e.Consumed
+		}
+	}
+	monthEnd := monthStart.AddDate(0, 1, -1)
+	// Monday-first leading pad: Monday=0 .. Sunday=6.
+	firstCol := (int(monthStart.Weekday()) + 6) % 7
+	todayStr := now.Format("2006-01-02")
+
+	var cells []copilotHeatCell
+	for i := 0; i < firstCol; i++ {
+		cells = append(cells, copilotHeatCell{Empty: true})
+	}
+	for d := monthStart; !d.After(monthEnd); d = d.AddDate(0, 0, 1) {
+		ds := d.Format("2006-01-02")
+		c := byDay[ds]
+		level := 0
+		if maxConsumed > 0 && c > 0 {
+			switch r := c / maxConsumed; {
+			case r > 0.75:
+				level = 4
+			case r > 0.5:
+				level = 3
+			case r > 0.25:
+				level = 2
+			default:
+				level = 1
+			}
+		}
+		cells = append(cells, copilotHeatCell{
+			DayNum:   d.Day(),
+			Level:    level,
+			Consumed: c,
+			DateStr:  ds,
+			IsToday:  ds == todayStr,
+			IsFuture: d.After(now) && ds != todayStr,
+		})
+	}
+	for len(cells)%7 != 0 {
+		cells = append(cells, copilotHeatCell{Empty: true})
+	}
+
+	rows := make([]copilotHeatRow, 0, len(cells)/7)
+	for i := 0; i < len(cells); i += 7 {
+		row := copilotHeatRow{Cells: cells[i : i+7]}
+		for _, c := range row.Cells {
+			if !c.Empty && c.DateStr != "" {
+				if t, err := time.Parse("2006-01-02", c.DateStr); err == nil {
+					_, w := t.ISOWeek()
+					row.WeekNum = w
+				}
+				break
+			}
+		}
+		rows = append(rows, row)
+	}
+	return rows
+}
+
+// sumConsumption sums the consumed credits across entries.
+func sumConsumption(entries []copilot.DailyConsumption) float64 {
+	var s float64
+	for _, e := range entries {
+		s += e.Consumed
+	}
+	return s
+}
+
+// isCurrentPeriod reports whether the selected date/period covers "now", used to
+// hide the "current" jump button when already viewing the present.
+func isCurrentPeriod(now, date time.Time, period string, start time.Time) bool {
+	switch period {
+	case "month":
+		return now.Year() == date.Year() && now.Month() == date.Month()
+	default: // week
+		cw, _ := weekBounds(now)
+		return sameDate(start, cw)
+	}
+}
+
+// daysBetween returns the whole-day count from "from" to "to" (at least 1),
+// used for the "reset in N days" chip.
+func daysBetween(from, to time.Time) int {
+	if to.Before(from) {
+		return 1
+	}
+	d := int(to.Sub(from).Hours() / 24)
+	if d < 1 {
+		d = 1
+	}
+	return d
+}
+
+// heatmapDow returns the Monday-first weekday header labels for the heatmap.
+func heatmapDow(locale i18n.Locale) []string {
+	order := []time.Weekday{time.Monday, time.Tuesday, time.Wednesday, time.Thursday, time.Friday, time.Saturday, time.Sunday}
+	out := make([]string, 0, len(order))
+	for _, wd := range order {
+		out = append(out, i18n.WeekdayShortFor(wd, locale))
+	}
+	return out
+}
+
+// periodFromQuery normalizes the ?period= value, defaulting to "week".
+func periodFromQuery(v string) string {
+	switch v {
+	case "week", "month":
+		return v
+	default:
+		return "week"
+	}
+}
+
+// periodLabel returns a human-readable range label for the current period.
+func periodLabel(period string, start, end time.Time, locale i18n.Locale, catalog i18n.Catalog) string {
+	switch period {
+	case "month":
+		return i18n.MonthYear(start, locale)
+	default: // week
+		return catalog.Tf(locale, "WeekRange", map[string]any{"Start": i18n.DateShort(start, locale), "End": i18n.DateShort(end, locale)})
+	}
+}
+
+// nextFetchAt returns when the next hourly copilot fetch is expected, or zero.
+func (s *Server) nextFetchAt() time.Time {
+	interval := s.config().CopilotInterval()
+	if interval <= 0 {
+		return time.Time{}
+	}
+	now := s.clk.Now()
+	return now.Add(interval)
+}
+
 func (s *Server) handleMonth(w http.ResponseWriter, r *http.Request) {
 	date := s.clk.Now().In(s.location())
 	if d := r.URL.Query().Get("date"); d != "" {
@@ -967,10 +1342,24 @@ func (s *Server) handleSettingsSave(w http.ResponseWriter, r *http.Request) {
 	cfg.Server.ListenAddress = r.FormValue("listen_address")
 	cfg.App.Timezone = r.FormValue("timezone")
 	cfg.App.Language = r.FormValue("language")
+	cfg.App.Navigation = r.FormValue("navigation")
 	if weekdays, ok := r.Form["today_weekdays"]; ok {
 		cfg.App.TodayWeekdays = weekdays
 	} else {
 		cfg.App.TodayWeekdays = []string{}
+	}
+
+	cfg.Copilot.Enabled = r.FormValue("copilot_enabled") == "true"
+	cfg.Copilot.FetchInterval = r.FormValue("copilot_fetch_interval")
+	cfg.Copilot.GHPath = r.FormValue("copilot_gh_path")
+	dlStr := strings.TrimSpace(r.FormValue("copilot_daily_limit"))
+	if dl, err := strconv.Atoi(dlStr); err == nil {
+		cfg.Copilot.DailyLimit = dl
+	} else {
+		// Surface an explicit error instead of silently resetting to the
+		// default; an empty or non-numeric field is almost always a typo.
+		s.renderSettings(w, r, cfg, s.catalog.T(s.locale(), "CopilotDailyLimitInvalid"), r.FormValue("active_tab"), http.StatusBadRequest)
+		return
 	}
 
 	if err := cfg.Validate(); err != nil {
@@ -984,13 +1373,7 @@ func (s *Server) handleSettingsSave(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	loc := time.Local
-	if cfg.App.Timezone != "" && cfg.App.Timezone != "local" {
-		if l, err := time.LoadLocation(cfg.App.Timezone); err == nil {
-			loc = l
-		}
-	}
-	s.setConfig(cfg, loc)
+	s.setConfig(cfg, cfg.Location())
 
 	http.Redirect(w, r, "/", http.StatusFound)
 }

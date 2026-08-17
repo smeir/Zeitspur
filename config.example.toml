@@ -12,4 +12,16 @@ listen_address = "127.0.0.1:8787"
 [app]
 timezone = "local" # "local" or a valid IANA timezone such as "Europe/Berlin"
 language = "de"    # "de" or "en"
+navigation = "top" # "top" (horizontal menu bar) or "side" (left sidebar)
 today_weekdays = ["mon", "tue", "wed", "thu", "fri"] # Days shown in the Today view week chart.
+
+[copilot]
+# GitHub Copilot AI credit tracking. The fetcher shells out to `gh api
+# copilot_internal/user` every fetch_interval and stores a quota snapshot.
+# Requires `gh auth login` to be configured; no token is stored by Zeitspur.
+# Only high-level quota numbers are kept — never prompts, models, or content.
+enabled = true
+fetch_interval = "1h"
+gh_path = "gh" # Override only if gh is not on PATH.
+# Credits consumed per day at which a desktop notification is shown. 0 disables.
+daily_limit = 2500

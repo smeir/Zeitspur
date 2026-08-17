@@ -45,17 +45,10 @@ type Server struct {
 
 // NewServer creates and configures the web server.
 func NewServer(db *sql.DB, cfg config.Config, paths config.Paths, provider activity.ActivityProvider, clk clock.Clock, version string) (*Server, error) {
-	loc := time.Local
-	if cfg.App.Timezone != "" && cfg.App.Timezone != "local" {
-		var err error
-		loc, err = time.LoadLocation(cfg.App.Timezone)
-		if err != nil {
-			return nil, fmt.Errorf("load timezone: %w", err)
-		}
-	}
+	loc := cfg.Location()
 
 	catalog := i18n.NewCatalog()
-	pageNames := []string{"today", "week", "month", "booking", "closures", "closure_detail", "settings", "close_preview"}
+	pageNames := []string{"today", "week", "month", "booking", "closures", "closure_detail", "settings", "close_preview", "copilot"}
 	templates := make(map[i18n.Locale]map[string]*template.Template)
 	for _, locale := range i18n.SupportedLocales() {
 		templates[locale] = make(map[string]*template.Template)
@@ -99,6 +92,8 @@ func NewServer(db *sql.DB, cfg config.Config, paths config.Paths, provider activ
 
 	r.Get("/week", s.handleWeek)
 	r.Get("/month", s.handleMonth)
+
+	r.Get("/copilot", s.handleCopilot)
 
 	r.Get("/booking", s.handleBooking)
 	r.Post("/booking-day", s.handleBookingDay)
@@ -232,6 +227,7 @@ func (s *Server) renderLayout(w http.ResponseWriter, r *http.Request, name strin
 	data["CSRFToken"] = csrfToken(r)
 	data["Lang"] = string(locale)
 	data["Locale"] = locale
+	data["NavLayout"] = s.config().NavigationLayout()
 	s.addActivityStatusData(r.Context(), data)
 	setTranslatedTitles(data, s.catalog, locale)
 	page, ok := s.templates[locale][name]

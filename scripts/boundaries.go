@@ -41,7 +41,7 @@ var rules = []rule{
 	},
 	{
 		name:           "capture",
-		sourcePrefixes: []string{"internal/activity"},
+		sourcePrefixes: []string{"internal/activity", "internal/copilot"},
 		allowedPrefixes: []string{
 			"internal/clock",
 			"internal/database",
@@ -75,6 +75,7 @@ var rules = []rule{
 		allowedPrefixes: []string{
 			"internal/booking",
 			"internal/closure",
+			"internal/copilot",
 			"internal/timeline",
 			"internal/clock",
 			"internal/config",

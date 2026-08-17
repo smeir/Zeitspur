@@ -92,6 +92,16 @@ func WeekdayShort(t time.Time, locale Locale) string {
 	}
 }
 
+// WeekdayShortFor returns the localized abbreviated weekday name for a time.Weekday.
+func WeekdayShortFor(wd time.Weekday, locale Locale) string {
+	switch locale {
+	case German:
+		return germanWeekdaysShort[wd]
+	default:
+		return wd.String()[:3]
+	}
+}
+
 // MonthName returns the localized full month name.
 func MonthName(t time.Time, locale Locale) string {
 	switch locale {

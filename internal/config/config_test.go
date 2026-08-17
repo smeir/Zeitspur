@@ -138,6 +138,30 @@ func TestValidate_InvalidTimezone(t *testing.T) {
 	}
 }
 
+func TestValidate_InvalidNavigation(t *testing.T) {
+	cfg, _ := Load("")
+	cfg.App.Navigation = "bottom"
+	if err := cfg.Validate(); err == nil || !strings.Contains(err.Error(), "navigation") {
+		t.Fatalf("expected invalid navigation error, got %v", err)
+	}
+}
+
+func TestNavigationLayout_DefaultsAndOverride(t *testing.T) {
+	cfg, _ := Load("")
+	if got := cfg.NavigationLayout(); got != "top" {
+		t.Fatalf("default navigation = %q, want top", got)
+	}
+	cfg.App.Navigation = "side"
+	if got := cfg.NavigationLayout(); got != "side" {
+		t.Fatalf("navigation = %q, want side", got)
+	}
+	// Empty or unknown values fall back to the default.
+	cfg.App.Navigation = ""
+	if got := cfg.NavigationLayout(); got != "top" {
+		t.Fatalf("empty navigation = %q, want top", got)
+	}
+}
+
 func TestValidate_InvalidTodayWeekdays(t *testing.T) {
 	tests := []struct {
 		name     string
@@ -193,6 +217,13 @@ func TestValidate_InvalidDurations(t *testing.T) {
 				c.Server.ListenAddress = ""
 			},
 			errSub: "listen_address",
+		},
+		{
+			name: "negative copilot daily limit",
+			setup: func(c *Config) {
+				c.Copilot.DailyLimit = -1
+			},
+			errSub: "daily_limit",
 		},
 	}
 
