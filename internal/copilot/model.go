@@ -6,6 +6,15 @@ package copilot
 
 import "time"
 
+// DollarsPerCredit is the fixed display conversion from one Copilot credit to
+// US dollars.
+const DollarsPerCredit = 0.01
+
+// CreditsToDollars converts Copilot credits to US dollars for presentation.
+func CreditsToDollars(credits float64) float64 {
+	return credits * DollarsPerCredit
+}
+
 // WarningLevel classifies how close the Copilot credit quota is to exhaustion.
 type WarningLevel string
 

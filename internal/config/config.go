@@ -26,9 +26,15 @@ const (
 	DefaultCopilotEnabled       = true
 	DefaultCopilotFetchInterval = 1 * time.Hour
 	DefaultCopilotDailyLimit    = 2500
+	DefaultCopilotDisplayUnit   = CopilotDisplayUnitCredits
 )
 
 const (
+	// CopilotDisplayUnitCredits renders Copilot amounts as credits.
+	CopilotDisplayUnitCredits = "credits"
+	// CopilotDisplayUnitDollars renders Copilot amounts as US dollars.
+	CopilotDisplayUnitDollars = "dollars"
+
 	// ActivityModeIdleAndLock tracks pauses from idle, lock, and suspend signals.
 	ActivityModeIdleAndLock = "idle_and_lock"
 	// ActivityModeLockOnly tracks pauses from screen lock and suspend signals only.
@@ -113,6 +119,7 @@ type CopilotConfig struct {
 	FetchInterval string `toml:"fetch_interval"`
 	GHPath        string `toml:"gh_path"`
 	DailyLimit    int    `toml:"daily_limit"`
+	DisplayUnit   string `toml:"display_unit"`
 }
 
 // Duration helpers after parsing.
@@ -167,6 +174,15 @@ func (c Config) CopilotGHPath() string {
 // treat the result as non-negative.
 func (c Config) CopilotDailyLimit() int {
 	return c.Copilot.DailyLimit
+}
+
+// CopilotDisplayUnit returns the configured unit for Copilot amounts in the
+// web UI. Validate allows only the known units; an empty value uses credits.
+func (c Config) CopilotDisplayUnit() string {
+	if c.Copilot.DisplayUnit == CopilotDisplayUnitDollars {
+		return CopilotDisplayUnitDollars
+	}
+	return DefaultCopilotDisplayUnit
 }
 
 // TodayWeekdays returns the weekdays shown in the Today view week chart.
@@ -242,6 +258,7 @@ func Load(path string) (Config, error) {
 			FetchInterval: DefaultCopilotFetchInterval.String(),
 			GHPath:        "gh",
 			DailyLimit:    DefaultCopilotDailyLimit,
+			DisplayUnit:   DefaultCopilotDisplayUnit,
 		},
 	}
 
@@ -327,6 +344,9 @@ func (c Config) Validate() error {
 	}
 	if c.Copilot.DailyLimit < 0 {
 		return fmt.Errorf("copilot.daily_limit must not be negative")
+	}
+	if c.Copilot.DisplayUnit != "" && c.Copilot.DisplayUnit != CopilotDisplayUnitCredits && c.Copilot.DisplayUnit != CopilotDisplayUnitDollars {
+		return fmt.Errorf("invalid copilot.display_unit %q: must be %q or %q", c.Copilot.DisplayUnit, CopilotDisplayUnitCredits, CopilotDisplayUnitDollars)
 	}
 	if c.App.TodayWeekdays != nil && len(c.App.TodayWeekdays) == 0 {
 		return fmt.Errorf("today_weekdays must contain at least one valid weekday")

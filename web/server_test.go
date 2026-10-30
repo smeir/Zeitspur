@@ -252,6 +252,9 @@ func TestServer_SettingsRendersCopilotFields(t *testing.T) {
 		`name="copilot_fetch_interval"`,
 		`name="copilot_gh_path"`,
 		`name="copilot_daily_limit"`,
+		`name="copilot_display_unit"`,
+		`<option value="credits"`,
+		`<option value="dollars"`,
 		`name="theme"`,
 		`<option value="teal"`,
 		`<option value="aurora"`,
@@ -281,6 +284,7 @@ func TestServer_SettingsSavePersistsCopilotFields(t *testing.T) {
 	form.Set("copilot_fetch_interval", "1h")
 	form.Set("copilot_gh_path", "gh")
 	form.Set("copilot_daily_limit", "1800")
+	form.Set("copilot_display_unit", "dollars")
 
 	req := httptest.NewRequest(http.MethodPost, "/settings", strings.NewReader(form.Encode()))
 	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
@@ -303,6 +307,9 @@ func TestServer_SettingsSavePersistsCopilotFields(t *testing.T) {
 	}
 	if cfg.CopilotDailyLimit() != 1800 {
 		t.Errorf("daily_limit = %d, want 1800", cfg.CopilotDailyLimit())
+	}
+	if cfg.CopilotDisplayUnit() != config.CopilotDisplayUnitDollars {
+		t.Errorf("display_unit = %q, want %q", cfg.CopilotDisplayUnit(), config.CopilotDisplayUnitDollars)
 	}
 	if cfg.Theme() != "aurora" {
 		t.Errorf("theme = %q, want aurora", cfg.Theme())
@@ -404,6 +411,58 @@ func TestServer_CopilotPageRendersStatusCard(t *testing.T) {
 	for _, gone := range []string{"Letzter Abruf"} {
 		if strings.Contains(body, gone) {
 			t.Errorf("copilot page still contains trimmed label %q", gone)
+		}
+	}
+}
+
+func TestServer_CopilotPageRendersDollarAmounts(t *testing.T) {
+	srv, db := newTestServer(t)
+	cfg := srv.config()
+	cfg.Copilot.DisplayUnit = config.CopilotDisplayUnitDollars
+	srv.setConfig(cfg, cfg.Location())
+
+	now := time.Now().UTC().Truncate(time.Second)
+	repo := copilot.NewRepository(db)
+	for _, snap := range []*copilot.Snapshot{
+		{
+			FetchedAt:          now.Add(-time.Hour),
+			OK:                 true,
+			EntitlementCredits: 5000,
+			RemainingCredits:   5000,
+			UsedCredits:        0,
+			PercentRemaining:   100,
+		},
+		{
+			FetchedAt:          now,
+			OK:                 true,
+			Plan:               "test-plan",
+			EntitlementCredits: 5000,
+			RemainingCredits:   4000,
+			UsedCredits:        1000,
+			PercentRemaining:   80,
+			WarningLevel:       copilot.WarningNotice,
+		},
+	} {
+		if err := repo.Store(context.Background(), snap); err != nil {
+			t.Fatalf("store snapshot: %v", err)
+		}
+	}
+
+	req := httptest.NewRequest(http.MethodGet, "/copilot", nil)
+	rr := httptest.NewRecorder()
+	srv.ServeHTTP(rr, req)
+	if rr.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d", rr.Code)
+	}
+	body := rr.Body.String()
+	for _, want := range []string{"$10.00 / $50.00", "$10.00"} {
+		if !strings.Contains(body, want) {
+			t.Errorf("dollar Copilot page missing %q", want)
+		}
+	}
+	for _, gone := range []string{"1000 / 5000", "1000.0"} {
+		if strings.Contains(body, gone) {
+			t.Errorf("dollar Copilot page still contains credit amount %q", gone)
 		}
 	}
 }

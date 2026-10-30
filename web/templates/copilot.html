@@ -38,7 +38,7 @@
         </svg>
         <div class="cp-ring-center">
           <div class="cp-ring-pct">{{ ceil .LatestUsedPercent }}%</div>
-          <div class="cp-ring-abs">{{ ceil .Latest.UsedCredits }} / {{ ceil .Latest.EntitlementCredits }}</div>
+          <div class="cp-ring-abs">{{ copilotAmount .Latest.UsedCredits .CopilotDisplayUnit }} / {{ copilotAmount .Latest.EntitlementCredits .CopilotDisplayUnit }}</div>
           <div class="cp-ring-label">{{ T "CopilotUsedLabel" }}</div>
           <div class="cp-ring-badge warn-{{ .Latest.WarningLevel }}">{{ .LatestWarning }}</div>
         </div>
@@ -49,8 +49,8 @@
           {{ if .Latest.Organizations }}<span class="cp-org">{{ T "CopilotOrganization" }}: <strong>{{ range $i, $o := .Latest.Organizations }}{{ if $i }}, {{ end }}{{ $o }}{{ end }}</strong></span>{{ end }}
         </div>
         <div class="cp-hero-stats">
-          <div class="cp-hero-stat"><div class="k">{{ T "CopilotConsumedToday" }}</div><div class="v">{{ ceil .TodayConsumed }}</div>{{ if .HasTrend }}<div class="f"><span class="{{ if .TrendUp }}cp-trend-up{{ else }}cp-trend-down{{ end }}">{{ if .TrendUp }}↑{{ else }}↓{{ end }} {{ printf "%.0f" .TrendAbs }}%</span></div>{{ end }}</div>
-          <div class="cp-hero-stat"><div class="k">{{ T "CopilotAvgPerDay" }}</div><div class="v">{{ ceil .AvgPerDay }}</div></div>
+          <div class="cp-hero-stat"><div class="k">{{ T "CopilotConsumedToday" }}</div><div class="v">{{ copilotAmount .TodayConsumed .CopilotDisplayUnit }}</div>{{ if .HasTrend }}<div class="f"><span class="{{ if .TrendUp }}cp-trend-up{{ else }}cp-trend-down{{ end }}">{{ if .TrendUp }}↑{{ else }}↓{{ end }} {{ printf "%.0f" .TrendAbs }}%</span></div>{{ end }}</div>
+          <div class="cp-hero-stat"><div class="k">{{ T "CopilotAvgPerDay" }}</div><div class="v">{{ copilotAmount .AvgPerDay .CopilotDisplayUnit }}</div></div>
         </div>
         {{ if .Projection.Show }}
         <div class="cp-proj cp-proj-{{ .Projection.Status }}">
@@ -85,7 +85,7 @@
     <div class="cp-chart-scroll">
       <div class="cp-chart">
         {{ range .ChartDays }}
-        <div class="cp-bar-col{{ if .IsToday }} today{{ end }}{{ if .IsFuture }} future{{ end }}" title="{{ .DateStr }} · {{ if .Consumed }}{{ ceil .Consumed }}{{ else }}{{ T "CopilotNoConsumption" }}{{ end }}">
+        <div class="cp-bar-col{{ if .IsToday }} today{{ end }}{{ if .IsFuture }} future{{ end }}" title="{{ .DateStr }} · {{ if .Consumed }}{{ copilotAmount .Consumed $.CopilotDisplayUnit }}{{ else }}{{ T "CopilotNoConsumption" }}{{ end }}">
           <div class="cp-bar-track">
             <div class="cp-bar" style="height: {{ .BarWidth }}%;"></div>
             {{ if .IsToday }}<div class="cp-bar-flag">{{ T "NavToday" }}</div>{{ end }}
@@ -100,7 +100,7 @@
       <span><i class="cp-i-today"></i>{{ T "NavToday" }}</span>
       <span><i class="cp-i-future"></i>{{ T "CopilotNoConsumption" }}</span>
     </div>
-    <p class="cp-total">{{ T "CopilotTotalConsumed" }}: <strong>{{ ceil .TotalConsumed }}</strong></p>
+    <p class="cp-total">{{ T "CopilotTotalConsumed" }}: <strong>{{ copilotAmount .TotalConsumed .CopilotDisplayUnit }}</strong></p>
     {{ else }}
     <div class="empty-state">{{ T "CopilotNoData" }}</div>
     {{ end }}
@@ -121,7 +121,7 @@
         {{ range .HeatmapDow }}<div class="cp-hm-dow">{{ . }}</div>{{ end }}
         {{ range .HeatmapRows }}
         <div class="cp-hm-row-label">{{ if gt .WeekNum 0 }}{{ Tf "ISOWeekShort" (dict "Week" .WeekNum) }}{{ end }}</div>
-        {{ range .Cells }}{{ if .Empty }}<div class="cp-hm-cell cp-hm-empty"></div>{{ else }}<div class="cp-hm-cell cp-hm-l{{ .Level }}{{ if .IsToday }} cp-hm-today{{ end }}{{ if .IsFuture }} cp-hm-future{{ end }}" title="{{ .DateStr }} · {{ if .Consumed }}{{ ceil .Consumed }}{{ else }}{{ T "CopilotNoConsumption" }}{{ end }}">{{ .DayNum }}</div>{{ end }}{{ end }}
+        {{ range .Cells }}{{ if .Empty }}<div class="cp-hm-cell cp-hm-empty"></div>{{ else }}<div class="cp-hm-cell cp-hm-l{{ .Level }}{{ if .IsToday }} cp-hm-today{{ end }}{{ if .IsFuture }} cp-hm-future{{ end }}" title="{{ .DateStr }} · {{ if .Consumed }}{{ copilotAmount .Consumed $.CopilotDisplayUnit }}{{ else }}{{ T "CopilotNoConsumption" }}{{ end }}">{{ .DayNum }}</div>{{ end }}{{ end }}
         {{ end }}
       </div>
     </div>

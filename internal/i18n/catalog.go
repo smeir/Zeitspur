@@ -230,12 +230,17 @@ func NewCatalog() Catalog {
 			"CopilotGHPath":            "Pfad zu gh",
 			"CopilotDailyLimit":        "Tägliches Limit",
 			"CopilotDailyLimitHint":    "Verbrauchte Credits pro Tag, ab denen eine Desktop-Benachrichtigung erscheint. 0 deaktiviert die Benachrichtigung.",
+			"CopilotDisplayUnit":       "Anzeigeeinheit",
+			"CopilotDisplayCredits":    "KI-Credits",
+			"CopilotDisplayDollars":    "US-Dollar",
+			"CopilotDisplayUnitHint":   "Copilot-Werte in der Übersicht als Credits oder US-Dollar anzeigen. 1 Credit entspricht 0,01 US-Dollar.",
 			"CopilotNotifyTitle":       "Copilot-Credit-Limit erreicht",
 			"CopilotNotifyBody":        "{{.Consumed}} von {{.Limit}} Credits heute verbraucht.",
+			"CopilotNotifyBodyDollars": "{{.Consumed}} von {{.Limit}} US-Dollar heute verbraucht.",
 			"CopilotDailyLimitInvalid": "Das tägliche Limit muss eine nicht-negative Zahl sein.",
 
 			// Copilot dashboard (hero, KPIs, chart, heatmap)
-			"CopilotQuotaStatus":       "Kontingent-Status",
+			"CopilotQuotaStatus":       "Status",
 			"CopilotUsedLabel":         "verbraucht",
 			"CopilotOrganization":      "Organisation",
 			"CopilotConsumedToday":     "Verbrauch heute",
@@ -454,8 +459,13 @@ func NewCatalog() Catalog {
 			"CopilotGHPath":            "Path to gh",
 			"CopilotDailyLimit":        "Daily limit",
 			"CopilotDailyLimitHint":    "Credits consumed per day at which a desktop notification appears. 0 disables notifications.",
+			"CopilotDisplayUnit":       "Display unit",
+			"CopilotDisplayCredits":    "AI credits",
+			"CopilotDisplayDollars":    "US dollars",
+			"CopilotDisplayUnitHint":   "Show Copilot amounts as credits or US dollars in the overview. 1 credit equals 0.01 US dollars.",
 			"CopilotNotifyTitle":       "Copilot credit limit reached",
 			"CopilotNotifyBody":        "{{.Consumed}} of {{.Limit}} credits consumed today.",
+			"CopilotNotifyBodyDollars": "{{.Consumed}} of {{.Limit}} US dollars consumed today.",
 			"CopilotDailyLimitInvalid": "The daily limit must be a non-negative number.",
 
 			// Copilot dashboard (hero, KPIs, chart, heatmap)

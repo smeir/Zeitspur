@@ -26,3 +26,6 @@ fetch_interval = "1h"
 gh_path = "gh" # Override only if gh is not on PATH.
 # Credits consumed per day at which a desktop notification is shown. 0 disables.
 daily_limit = 2500
+# Display Copilot amounts as "credits" or "dollars" in the web UI.
+# One credit equals 0.01 US dollars.
+display_unit = "credits"

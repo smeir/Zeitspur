@@ -631,6 +631,16 @@ func sameInstant(a, b time.Time) bool {
 	return delta < time.Second
 }
 
+// formatCopilotAmount renders a credit amount according to the configured
+// display unit. Credit values retain the historical whole-credit display;
+// dollar values preserve cents because one credit equals one cent.
+func formatCopilotAmount(credits float64, displayUnit string) string {
+	if displayUnit == config.CopilotDisplayUnitDollars {
+		return fmt.Sprintf("$%.2f", copilot.CreditsToDollars(credits))
+	}
+	return strconv.Itoa(int(math.Ceil(credits)))
+}
+
 // handleCopilot renders the Copilot credit dashboard. A period switch
 // (week/month) drives the consumption chart range via ?period= and ?date=.
 // The hero card shows the latest quota snapshot as a ring; KPI cards summarize
@@ -640,6 +650,7 @@ func (s *Server) handleCopilot(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	loc := s.location()
 	now := s.clk.Now().In(loc)
+	displayUnit := s.config().CopilotDisplayUnit()
 
 	repo := copilot.NewRepository(s.db)
 	latest, _ := repo.Latest(ctx)
@@ -710,21 +721,22 @@ func (s *Server) handleCopilot(w http.ResponseWriter, r *http.Request) {
 	}
 
 	data := map[string]any{
-		"Title":            "PageCopilot",
-		"Nav":              "copilot",
-		"Latest":           latest,
-		"Period":           period,
-		"HasData":          latest != nil,
-		"ChartDays":        chartDays,
-		"TotalConsumed":    total,
-		"Start":            start,
-		"End":              end,
-		"PrevDate":         prev.Format("2006-01-02"),
-		"NextDate":         next.Format("2006-01-02"),
-		"IsCurrent":        isCurrentPeriod(now, date, period, start),
-		"NextFetchAt":      s.nextFetchAt(),
-		"ConsumptionLabel": periodLabel(period, start, end, s.locale(), s.catalog),
-		"Now":              now,
+		"Title":              "PageCopilot",
+		"Nav":                "copilot",
+		"CopilotDisplayUnit": displayUnit,
+		"Latest":             latest,
+		"Period":             period,
+		"HasData":            latest != nil,
+		"ChartDays":          chartDays,
+		"TotalConsumed":      total,
+		"Start":              start,
+		"End":                end,
+		"PrevDate":           prev.Format("2006-01-02"),
+		"NextDate":           next.Format("2006-01-02"),
+		"IsCurrent":          isCurrentPeriod(now, date, period, start),
+		"NextFetchAt":        s.nextFetchAt(),
+		"ConsumptionLabel":   periodLabel(period, start, end, s.locale(), s.catalog),
+		"Now":                now,
 		// Hero stats
 		"TodayConsumed": todayCons,
 		"HasTrend":      hasTrend,
@@ -1371,6 +1383,9 @@ func (s *Server) handleSettingsSave(w http.ResponseWriter, r *http.Request) {
 	cfg.Copilot.Enabled = r.FormValue("copilot_enabled") == "true"
 	cfg.Copilot.FetchInterval = r.FormValue("copilot_fetch_interval")
 	cfg.Copilot.GHPath = r.FormValue("copilot_gh_path")
+	if displayUnit := strings.TrimSpace(r.FormValue("copilot_display_unit")); displayUnit != "" {
+		cfg.Copilot.DisplayUnit = displayUnit
+	}
 	dlStr := strings.TrimSpace(r.FormValue("copilot_daily_limit"))
 	if dl, err := strconv.Atoi(dlStr); err == nil {
 		cfg.Copilot.DailyLimit = dl

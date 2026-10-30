@@ -335,5 +335,6 @@ func templateFuncs(catalog i18n.Catalog, locale i18n.Locale) template.FuncMap {
 		"ceil": func(v float64) int {
 			return int(math.Ceil(v))
 		},
+		"copilotAmount": formatCopilotAmount,
 	}
 }

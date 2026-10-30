@@ -28,6 +28,9 @@ func TestLoad_EmptyPathReturnsDefaults(t *testing.T) {
 	if cfg.App.Timezone != DefaultTimezone {
 		t.Fatalf("expected default timezone %q, got %q", DefaultTimezone, cfg.App.Timezone)
 	}
+	if cfg.CopilotDisplayUnit() != DefaultCopilotDisplayUnit {
+		t.Fatalf("expected default Copilot display unit %q, got %q", DefaultCopilotDisplayUnit, cfg.CopilotDisplayUnit())
+	}
 	assertWeekdays(t, cfg.TodayWeekdays(), []time.Weekday{time.Monday, time.Tuesday, time.Wednesday, time.Thursday, time.Friday})
 }
 
@@ -55,6 +58,9 @@ listen_address = "127.0.0.1:9999"
 [app]
 timezone = "UTC"
 today_weekdays = ["mon", "wed", "fri"]
+
+[copilot]
+display_unit = "dollars"
 `
 	if err := os.WriteFile(path, []byte(content), 0o600); err != nil {
 		t.Fatalf("write config: %v", err)
@@ -78,6 +84,9 @@ today_weekdays = ["mon", "wed", "fri"]
 	}
 	if cfg.App.Timezone != "UTC" {
 		t.Fatalf("expected timezone UTC, got %q", cfg.App.Timezone)
+	}
+	if cfg.CopilotDisplayUnit() != CopilotDisplayUnitDollars {
+		t.Fatalf("expected Copilot display unit %q, got %q", CopilotDisplayUnitDollars, cfg.CopilotDisplayUnit())
 	}
 	assertWeekdays(t, cfg.TodayWeekdays(), []time.Weekday{time.Monday, time.Wednesday, time.Friday})
 }
@@ -151,6 +160,29 @@ func TestValidate_InvalidTheme(t *testing.T) {
 	cfg.App.Theme = "noir"
 	if err := cfg.Validate(); err == nil || !strings.Contains(err.Error(), "theme") {
 		t.Fatalf("expected invalid theme error, got %v", err)
+	}
+}
+
+func TestValidate_InvalidCopilotDisplayUnit(t *testing.T) {
+	cfg, _ := Load("")
+	cfg.Copilot.DisplayUnit = "euros"
+	if err := cfg.Validate(); err == nil || !strings.Contains(err.Error(), "display_unit") {
+		t.Fatalf("expected invalid Copilot display unit error, got %v", err)
+	}
+}
+
+func TestCopilotDisplayUnit_DefaultsAndOverride(t *testing.T) {
+	cfg, _ := Load("")
+	if got := cfg.CopilotDisplayUnit(); got != CopilotDisplayUnitCredits {
+		t.Fatalf("default Copilot display unit = %q, want %q", got, CopilotDisplayUnitCredits)
+	}
+	cfg.Copilot.DisplayUnit = CopilotDisplayUnitDollars
+	if got := cfg.CopilotDisplayUnit(); got != CopilotDisplayUnitDollars {
+		t.Fatalf("Copilot display unit = %q, want %q", got, CopilotDisplayUnitDollars)
+	}
+	cfg.Copilot.DisplayUnit = ""
+	if got := cfg.CopilotDisplayUnit(); got != CopilotDisplayUnitCredits {
+		t.Fatalf("empty Copilot display unit = %q, want %q", got, CopilotDisplayUnitCredits)
 	}
 }
 

@@ -331,10 +331,17 @@ func copilotMessageBuilder(cfg config.Config) copilot.MessageBuilder {
 	locale := i18n.ParseLocale(cfg.App.Language)
 	return func(consumed float64, limit int) (string, string) {
 		title := catalog.T(locale, "CopilotNotifyTitle")
-		body := catalog.Tf(locale, "CopilotNotifyBody", map[string]any{
+		bodyKey := "CopilotNotifyBody"
+		values := map[string]any{
 			"Consumed": fmt.Sprintf("%.0f", consumed),
 			"Limit":    limit,
-		})
+		}
+		if cfg.CopilotDisplayUnit() == config.CopilotDisplayUnitDollars {
+			bodyKey = "CopilotNotifyBodyDollars"
+			values["Consumed"] = fmt.Sprintf("$%.2f", copilot.CreditsToDollars(consumed))
+			values["Limit"] = fmt.Sprintf("$%.2f", copilot.CreditsToDollars(float64(limit)))
+		}
+		body := catalog.Tf(locale, bodyKey, values)
 		return title, body
 	}
 }

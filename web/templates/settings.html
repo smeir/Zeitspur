@@ -152,6 +152,14 @@
             <input type="number" name="copilot_daily_limit" value="{{ .Config.CopilotDailyLimit }}" min="0" step="1">
             <span class="hint">{{ T "CopilotDailyLimitHint" }}</span>
           </label>
+
+          <label>{{ T "CopilotDisplayUnit" }}
+            <select name="copilot_display_unit">
+              <option value="credits" {{ if eq .Config.CopilotDisplayUnit "credits" }}selected{{ end }}>{{ T "CopilotDisplayCredits" }}</option>
+              <option value="dollars" {{ if eq .Config.CopilotDisplayUnit "dollars" }}selected{{ end }}>{{ T "CopilotDisplayDollars" }}</option>
+            </select>
+            <span class="hint">{{ T "CopilotDisplayUnitHint" }}</span>
+          </label>
         </div>
       </section>
 
