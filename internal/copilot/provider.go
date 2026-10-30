@@ -46,7 +46,7 @@ func (p *GHCLIProvider) Fetch(ctx context.Context) (*Snapshot, error) {
 	if snap == nil {
 		return nil, &FetchError{
 			Kind:   ErrorKindParse,
-			Detail: "no premium_interactions quota in response",
+			Detail: "no usable premium_interactions quota in response",
 		}
 	}
 	return snap, nil

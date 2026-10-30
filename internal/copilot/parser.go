@@ -27,14 +27,17 @@ type rawSlot struct {
 }
 
 // Parse parses the stdout of `gh api copilot_internal/user` into a Snapshot
-// with OK=true. Missing or malformed input yields nil.
+// with OK=true. Missing or malformed input yields nil. A quota without a
+// positive entitlement also yields nil: GitHub occasionally returns an
+// all-zero premium_interactions slot, and storing it as a valid snapshot would
+// turn the next real reading into a jump of the full monthly usage.
 func Parse(raw []byte) *Snapshot {
 	var root rawQuota
 	if err := json.Unmarshal(raw, &root); err != nil {
 		return nil
 	}
 	slot, ok := root.QuotaSnapshots["premium_interactions"]
-	if !ok {
+	if !ok || slot.Entitlement <= 0 {
 		return nil
 	}
 	remaining := slot.QuotaRemaining

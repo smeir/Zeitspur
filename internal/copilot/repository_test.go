@@ -3,6 +3,7 @@ package copilot
 import (
 	"context"
 	"database/sql"
+	"math"
 	"testing"
 	"time"
 
@@ -119,21 +120,21 @@ func TestConsumptionSumsPositiveDeltas(t *testing.T) {
 	if entries[0].Consumed != 30 {
 		t.Errorf("consumed = %v, want 30", entries[0].Consumed)
 	}
-	if entries[0].Samples != 3 {
-		t.Errorf("samples = %d, want 3", entries[0].Samples)
-	}
 }
 
 func TestConsumptionResetsNegativeDelta(t *testing.T) {
 	loc := time.UTC
 	db := newTestDB(t)
 	repo := NewRepository(db)
-	// Day 1: used climbs to 20. Day 2: quota resets so used drops to 5.
-	mustStore(t, repo, okSnap(time.Date(2026, 6, 8, 9, 0, 0, 0, loc), 0))
-	mustStore(t, repo, okSnap(time.Date(2026, 6, 8, 10, 0, 0, 0, loc), 10))
-	mustStore(t, repo, okSnap(time.Date(2026, 6, 8, 11, 0, 0, 0, loc), 20))
-	mustStore(t, repo, okSnap(time.Date(2026, 6, 9, 9, 0, 0, 0, loc), 0))
-	mustStore(t, repo, okSnap(time.Date(2026, 6, 9, 10, 0, 0, 0, loc), 5))
+	// Day 1: used climbs to 20. Day 2: quota resets (reset date moves from
+	// June 9 to July 9) so used drops to 0 and climbs to 5.
+	june := time.Date(2026, 6, 9, 0, 0, 0, 0, loc)
+	july := time.Date(2026, 7, 9, 0, 0, 0, 0, loc)
+	mustStore(t, repo, periodSnap(time.Date(2026, 6, 8, 9, 0, 0, 0, loc), 0, june))
+	mustStore(t, repo, periodSnap(time.Date(2026, 6, 8, 10, 0, 0, 0, loc), 10, june))
+	mustStore(t, repo, periodSnap(time.Date(2026, 6, 8, 11, 0, 0, 0, loc), 20, june))
+	mustStore(t, repo, periodSnap(time.Date(2026, 6, 9, 9, 0, 0, 0, loc), 0, july))
+	mustStore(t, repo, periodSnap(time.Date(2026, 6, 9, 10, 0, 0, 0, loc), 5, july))
 
 	start := time.Date(2026, 6, 8, 0, 0, 0, 0, loc)
 	end := time.Date(2026, 6, 9, 23, 59, 59, 0, loc)
@@ -151,6 +152,76 @@ func TestConsumptionResetsNegativeDelta(t *testing.T) {
 	// After reset (used 20 → 0), the next delta is 5-0=5; total for day2 = 5.
 	if byDay["2026-06-09"] != 5 {
 		t.Errorf("day2 = %v, want 5", byDay["2026-06-09"])
+	}
+}
+
+func TestConsumptionCountsResetWhenResetDateHasPassed(t *testing.T) {
+	loc := time.UTC
+	db := newTestDB(t)
+	repo := NewRepository(db)
+	// GitHub may reset used credits before it moves the reset date. A drop
+	// fetched at or after the previous reset date is still a reset.
+	june := time.Date(2026, 6, 9, 0, 0, 0, 0, loc)
+	mustStore(t, repo, periodSnap(time.Date(2026, 6, 8, 22, 0, 0, 0, loc), 20, june))
+	mustStore(t, repo, periodSnap(time.Date(2026, 6, 9, 1, 0, 0, 0, loc), 3, june))
+
+	start := time.Date(2026, 6, 9, 0, 0, 0, 0, loc)
+	end := time.Date(2026, 6, 9, 23, 59, 59, 0, loc)
+	entries, err := repo.Consumption(context.Background(), start, end, loc)
+	if err != nil {
+		t.Fatalf("consumption: %v", err)
+	}
+	if got := TotalConsumed(entries); got != 3 {
+		t.Errorf("total = %v, want 3", got)
+	}
+}
+
+// TestConsumptionSkipsPlaceholderSnapshot replays the snapshots of
+// 2026-10-28: after a failed fetch GitHub returned entitlement=1 and
+// remaining=1. Treating the drop to used=0 as a reset counted the full
+// monthly usage (37209.8 credits) again on the next real reading.
+func TestConsumptionSkipsPlaceholderSnapshot(t *testing.T) {
+	loc := time.UTC
+	db := newTestDB(t)
+	repo := NewRepository(db)
+	reset := time.Date(2026, 11, 1, 0, 0, 0, 0, loc)
+	mustStore(t, repo, entitledSnap(time.Date(2026, 10, 27, 23, 0, 0, 0, loc), 50000, 35018.5, reset))
+	mustStore(t, repo, entitledSnap(time.Date(2026, 10, 28, 18, 27, 0, 0, loc), 50000, 37046.4, reset))
+	mustStore(t, repo, &Snapshot{FetchedAt: time.Date(2026, 10, 28, 18, 47, 0, 0, loc), OK: false, ErrorMessage: "unexpected EOF"})
+	mustStore(t, repo, entitledSnap(time.Date(2026, 10, 28, 19, 7, 0, 0, loc), 1, 0, reset))
+	mustStore(t, repo, entitledSnap(time.Date(2026, 10, 28, 19, 26, 0, 0, loc), 50000, 37209.8, reset))
+	mustStore(t, repo, entitledSnap(time.Date(2026, 10, 28, 22, 51, 0, 0, loc), 50000, 37571.8, reset))
+
+	start := time.Date(2026, 10, 28, 0, 0, 0, 0, loc)
+	end := time.Date(2026, 10, 28, 23, 59, 59, 0, loc)
+	entries, err := repo.Consumption(context.Background(), start, end, loc)
+	if err != nil {
+		t.Fatalf("consumption: %v", err)
+	}
+	if got := TotalConsumed(entries); math.Abs(got-2553.3) > 0.000001 {
+		t.Errorf("total = %v, want 2553.3", got)
+	}
+}
+
+func TestConsumptionSkipsPlaceholderAsBaseline(t *testing.T) {
+	loc := time.UTC
+	db := newTestDB(t)
+	repo := NewRepository(db)
+	reset := time.Date(2026, 11, 1, 0, 0, 0, 0, loc)
+	// The placeholder is the last snapshot before the range starts; the
+	// baseline must fall back to the last plausible reading.
+	mustStore(t, repo, entitledSnap(time.Date(2026, 10, 28, 23, 0, 0, 0, loc), 50000, 37000, reset))
+	mustStore(t, repo, entitledSnap(time.Date(2026, 10, 28, 23, 30, 0, 0, loc), 1, 0, reset))
+	mustStore(t, repo, entitledSnap(time.Date(2026, 10, 29, 8, 0, 0, 0, loc), 50000, 37100, reset))
+
+	start := time.Date(2026, 10, 29, 0, 0, 0, 0, loc)
+	end := time.Date(2026, 10, 29, 23, 59, 59, 0, loc)
+	entries, err := repo.Consumption(context.Background(), start, end, loc)
+	if err != nil {
+		t.Fatalf("consumption: %v", err)
+	}
+	if got := TotalConsumed(entries); got != 100 {
+		t.Errorf("total = %v, want 100", got)
 	}
 }
 
@@ -173,6 +244,114 @@ func TestConsumptionSkipsFailedSnapshots(t *testing.T) {
 	}
 	if TotalConsumed(entries) != 25 {
 		t.Errorf("total = %v, want 25", TotalConsumed(entries))
+	}
+}
+
+func TestConsumptionSkipsZeroEntitlementSnapshots(t *testing.T) {
+	loc := time.UTC
+	db := newTestDB(t)
+	repo := NewRepository(db)
+	// Predecessor on the previous day anchors the delta.
+	mustStore(t, repo, okSnap(time.Date(2026, 6, 7, 18, 0, 0, 0, loc), 2000))
+	mustStore(t, repo, okSnap(time.Date(2026, 6, 8, 9, 0, 0, 0, loc), 2010))
+	// An OK but all-zero response (stored before Parse rejected it) must not
+	// count as a quota reset: recovering to 2010 would otherwise add 2010.
+	zero := &Snapshot{FetchedAt: time.Date(2026, 6, 8, 10, 0, 0, 0, loc), OK: true, PercentRemaining: 100}
+	mustStore(t, repo, zero)
+	mustStore(t, repo, okSnap(time.Date(2026, 6, 8, 11, 0, 0, 0, loc), 2010))
+	mustStore(t, repo, okSnap(time.Date(2026, 6, 8, 12, 0, 0, 0, loc), 2015))
+
+	start := time.Date(2026, 6, 8, 0, 0, 0, 0, loc)
+	end := time.Date(2026, 6, 8, 23, 59, 59, 0, loc)
+	entries, err := repo.Consumption(context.Background(), start, end, loc)
+	if err != nil {
+		t.Fatalf("consumption: %v", err)
+	}
+	if got := TotalConsumed(entries); got != 15 {
+		t.Errorf("total = %v, want 15", got)
+	}
+}
+
+func TestConsumptionAttributesInitialUsageToPreviousDay(t *testing.T) {
+	loc := time.UTC
+	db := newTestDB(t)
+	repo := NewRepository(db)
+	mustStore(t, repo, okSnap(time.Date(2026, 8, 14, 13, 0, 0, 0, loc), 3448.4))
+	mustStore(t, repo, okSnap(time.Date(2026, 8, 14, 14, 0, 0, 0, loc), 3534.1))
+
+	start := time.Date(2026, 8, 1, 0, 0, 0, 0, loc)
+	end := time.Date(2026, 8, 31, 23, 59, 59, 0, loc)
+	entries, err := repo.Consumption(context.Background(), start, end, loc)
+	if err != nil {
+		t.Fatalf("consumption: %v", err)
+	}
+
+	byDay := map[string]float64{}
+	for _, entry := range entries {
+		byDay[entry.Date.Format("2006-01-02")] = entry.Consumed
+	}
+	if got := byDay["2026-08-13"]; math.Abs(got-3448.4) > 0.000001 {
+		t.Errorf("initial usage = %v, want 3448.4 on previous day", got)
+	}
+	if got := byDay["2026-08-14"]; math.Abs(got-85.7) > 0.000001 {
+		t.Errorf("first measured delta = %v, want 85.7 on measurement day", got)
+	}
+	if got := TotalConsumed(entries); math.Abs(got-3534.1) > 0.000001 {
+		t.Errorf("total = %v, want 3534.1", got)
+	}
+}
+
+func TestConsumptionReturnsInitialUsageForPreviousDayAlone(t *testing.T) {
+	loc := time.UTC
+	db := newTestDB(t)
+	repo := NewRepository(db)
+	mustStore(t, repo, okSnap(time.Date(2026, 8, 14, 13, 0, 0, 0, loc), 3448.4))
+
+	start := time.Date(2026, 8, 13, 0, 0, 0, 0, loc)
+	end := time.Date(2026, 8, 13, 23, 59, 59, 0, loc)
+	entries, err := repo.Consumption(context.Background(), start, end, loc)
+	if err != nil {
+		t.Fatalf("consumption: %v", err)
+	}
+	if got := TotalConsumed(entries); math.Abs(got-3448.4) > 0.000001 {
+		t.Errorf("total = %v, want initial usage on previous day", got)
+	}
+}
+
+func TestConsumptionOmitsInitialUsageWhenPreviousDayIsOutsideRange(t *testing.T) {
+	loc := time.UTC
+	db := newTestDB(t)
+	repo := NewRepository(db)
+	mustStore(t, repo, okSnap(time.Date(2026, 8, 14, 13, 0, 0, 0, loc), 3448.4))
+	mustStore(t, repo, okSnap(time.Date(2026, 8, 14, 14, 0, 0, 0, loc), 3534.1))
+
+	start := time.Date(2026, 8, 14, 0, 0, 0, 0, loc)
+	end := time.Date(2026, 8, 14, 23, 59, 59, 0, loc)
+	entries, err := repo.Consumption(context.Background(), start, end, loc)
+	if err != nil {
+		t.Fatalf("consumption: %v", err)
+	}
+	if got := TotalConsumed(entries); math.Abs(got-85.7) > 0.000001 {
+		t.Errorf("total = %v, want only the measured 85.7 delta", got)
+	}
+}
+
+func TestConsumptionUsesSuccessfulPredecessorAcrossFailure(t *testing.T) {
+	loc := time.UTC
+	db := newTestDB(t)
+	repo := NewRepository(db)
+	mustStore(t, repo, okSnap(time.Date(2026, 6, 7, 22, 0, 0, 0, loc), 10))
+	mustStore(t, repo, &Snapshot{FetchedAt: time.Date(2026, 6, 7, 23, 0, 0, 0, loc), OK: false})
+	mustStore(t, repo, okSnap(time.Date(2026, 6, 8, 1, 0, 0, 0, loc), 25))
+
+	start := time.Date(2026, 6, 8, 0, 0, 0, 0, loc)
+	end := time.Date(2026, 6, 8, 23, 59, 59, 0, loc)
+	entries, err := repo.Consumption(context.Background(), start, end, loc)
+	if err != nil {
+		t.Fatalf("consumption: %v", err)
+	}
+	if TotalConsumed(entries) != 15 {
+		t.Errorf("total = %v, want 15 from last successful predecessor", TotalConsumed(entries))
 	}
 }
 
@@ -205,6 +384,28 @@ func okSnap(at time.Time, used float64) *Snapshot {
 		EntitlementCredits: 3000,
 		RemainingCredits:   3000 - used,
 		UsedCredits:        used,
+		WarningLevel:       WarningNone,
+	}
+}
+
+// periodSnap is okSnap with a reset date, for tests that cross a billing
+// period boundary.
+func periodSnap(at time.Time, used float64, resetAt time.Time) *Snapshot {
+	s := okSnap(at, used)
+	s.ResetAt = resetAt
+	return s
+}
+
+// entitledSnap is a successful snapshot with an explicit entitlement and
+// reset date, used to replay real quota readings.
+func entitledSnap(at time.Time, entitlement, used float64, resetAt time.Time) *Snapshot {
+	return &Snapshot{
+		FetchedAt:          at,
+		OK:                 true,
+		EntitlementCredits: entitlement,
+		RemainingCredits:   entitlement - used,
+		UsedCredits:        used,
+		ResetAt:            resetAt,
 		WarningLevel:       WarningNone,
 	}
 }

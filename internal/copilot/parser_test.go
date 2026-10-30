@@ -126,6 +126,23 @@ func TestParseRejectsMissingPremiumInteractions(t *testing.T) {
 	}
 }
 
+func TestParseRejectsZeroEntitlement(t *testing.T) {
+	// GitHub sometimes returns an all-zero slot; it must not become a valid
+	// snapshot with used = 0.
+	raw := mustJSON(t, map[string]any{
+		"quota_snapshots": map[string]any{
+			"premium_interactions": map[string]any{
+				"entitlement":       0,
+				"quota_remaining":   0,
+				"percent_remaining": 100,
+			},
+		},
+	})
+	if Parse(raw) != nil {
+		t.Error("expected nil for zero entitlement")
+	}
+}
+
 func TestParseClampsResetNegative(t *testing.T) {
 	// If remaining exceeds entitlement (shouldn't happen, but be defensive),
 	// used must not be negative.

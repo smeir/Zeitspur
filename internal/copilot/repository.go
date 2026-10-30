@@ -4,7 +4,6 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
-	"sort"
 	"strings"
 	"time"
 )
@@ -68,7 +67,8 @@ func (r *Repository) Latest(ctx context.Context) (*Snapshot, error) {
 	return scanSnapshot(row)
 }
 
-// Range returns snapshots with fetched_at in [start, end], ascending.
+// Range returns successful snapshots with fetched_at in [start, end],
+// ascending.
 func (r *Repository) Range(ctx context.Context, start, end time.Time) ([]*Snapshot, error) {
 	rows, err := r.db.QueryContext(ctx, `
 		SELECT fetched_at, ok, plan, organizations,
@@ -76,7 +76,7 @@ func (r *Repository) Range(ctx context.Context, start, end time.Time) ([]*Snapsh
 		       percent_remaining, reset_at, token_based_billing,
 		       warning_level, error_message, error_kind
 		FROM copilot_snapshots
-		WHERE fetched_at >= ? AND fetched_at <= ?
+		WHERE fetched_at >= ? AND fetched_at <= ? AND ok = 1
 		ORDER BY fetched_at ASC, id ASC
 	`, start.UTC().Format(time.RFC3339Nano), end.UTC().Format(time.RFC3339Nano))
 	if err != nil {
@@ -94,9 +94,28 @@ func (r *Repository) Range(ctx context.Context, start, end time.Time) ([]*Snapsh
 	return out, rows.Err()
 }
 
-// FirstBefore returns the most recent snapshot strictly before t, or nil.
-// It anchors the consumption delta at the start of a range so the first
-// snapshot inside the range has a predecessor to diff against.
+// FirstSuccessful returns the earliest successful snapshot, or nil. Its used
+// credits form the one-time opening balance for consumption history.
+func (r *Repository) FirstSuccessful(ctx context.Context) (*Snapshot, error) {
+	row := r.db.QueryRowContext(ctx, `
+		SELECT fetched_at, ok, plan, organizations,
+		       entitlement_credits, remaining_credits, used_credits,
+		       percent_remaining, reset_at, token_based_billing,
+		       warning_level, error_message, error_kind
+		FROM copilot_snapshots
+		WHERE ok = 1
+		ORDER BY fetched_at ASC, id ASC
+		LIMIT 1
+	`)
+	s, err := scanSnapshot(row)
+	if err == sql.ErrNoRows {
+		return nil, nil
+	}
+	return s, err
+}
+
+// FirstBefore returns the most recent successful snapshot strictly before t,
+// or nil.
 func (r *Repository) FirstBefore(ctx context.Context, t time.Time) (*Snapshot, error) {
 	row := r.db.QueryRowContext(ctx, `
 		SELECT fetched_at, ok, plan, organizations,
@@ -104,7 +123,7 @@ func (r *Repository) FirstBefore(ctx context.Context, t time.Time) (*Snapshot, e
 		       percent_remaining, reset_at, token_based_billing,
 		       warning_level, error_message, error_kind
 		FROM copilot_snapshots
-		WHERE fetched_at < ?
+		WHERE fetched_at < ? AND ok = 1
 		ORDER BY fetched_at DESC, id DESC
 		LIMIT 1
 	`, t.UTC().Format(time.RFC3339Nano))
@@ -171,22 +190,46 @@ func scanSnapshot(s scanner) (*Snapshot, error) {
 	return &snap, nil
 }
 
-// DailyConsumption aggregates credit consumption per calendar day (in loc).
-// Consumption between two consecutive successful snapshots is the positive
-// delta of used credits; a negative delta (quota reset) means the new period's
-// used total counts instead. Each delta is attributed to the day of its later
-// snapshot's fetched_at, in the given location.
+// baselineBefore returns the last successful snapshot strictly before t that
+// is not an implausible reading, or nil. A reading whose used credits drop below
+// its predecessor's without a quota reset is skipped, so a placeholder
+// response just before a range boundary cannot become the baseline.
+func (r *Repository) baselineBefore(ctx context.Context, t time.Time) (*Snapshot, error) {
+	candidate, err := r.FirstBefore(ctx, t)
+	for candidate != nil && err == nil {
+		prev, prevErr := r.FirstBefore(ctx, candidate.FetchedAt)
+		if prevErr != nil {
+			return nil, prevErr
+		}
+		if prev == nil || !implausibleDrop(prev, candidate) {
+			return candidate, nil
+		}
+		candidate = prev
+	}
+	return nil, err
+}
+
+// DailyConsumption is the credit consumption of one calendar day.
 type DailyConsumption struct {
 	Date     time.Time
 	Consumed float64
-	Samples  int
 }
 
 // Consumption returns the per-day consumption for snapshots in [start, end],
-// using loc to split days. It pulls one predecessor before start so the first
-// in-range snapshot has a baseline.
+// in ascending date order, using loc to split days. Consumption between two
+// consecutive successful snapshots is the positive delta of used credits;
+// after a quota reset the new period's used total counts instead. A drop
+// without a reset is an implausible reading and is skipped. Each delta is
+// attributed to the day of its later snapshot. A plausible predecessor before
+// start gives the first in-range snapshot a baseline. For the first successful
+// snapshot ever, its existing usage is attributed to the previous local
+// calendar day when that day is inside the requested range.
 func (r *Repository) Consumption(ctx context.Context, start, end time.Time, loc *time.Location) ([]DailyConsumption, error) {
-	anchor, err := r.FirstBefore(ctx, start)
+	first, err := r.FirstSuccessful(ctx)
+	if err != nil {
+		return nil, err
+	}
+	anchor, err := r.baselineBefore(ctx, start)
 	if err != nil {
 		return nil, err
 	}
@@ -194,46 +237,64 @@ func (r *Repository) Consumption(ctx context.Context, start, end time.Time, loc 
 	if err != nil {
 		return nil, err
 	}
-	chain := snaps
-	if anchor != nil {
-		chain = append([]*Snapshot{anchor}, snaps...)
+
+	// Snapshots arrive in ascending order, so each day is either the last
+	// entry or a new one.
+	var out []DailyConsumption
+	addConsumption := func(day time.Time, delta float64) {
+		if n := len(out); n == 0 || !out[n-1].Date.Equal(day) {
+			out = append(out, DailyConsumption{Date: day})
+		}
+		out[len(out)-1].Consumed += delta
 	}
 
-	byDay := make(map[string]*DailyConsumption)
-	var order []string
-	prev := (*Snapshot)(nil)
-	for _, s := range chain {
-		if !s.OK {
-			// Skip failed snapshots but keep prev so the next OK snapshot
-			// still diffs against the last good one.
+	if first != nil && first.UsedCredits > 0 {
+		baselineDay := dayStart(first.FetchedAt, loc).AddDate(0, 0, -1)
+		if !baselineDay.Before(dayStart(start, loc)) && !baselineDay.After(dayStart(end, loc)) {
+			addConsumption(baselineDay, first.UsedCredits)
+		}
+	}
+
+	prev := anchor
+	for _, s := range snaps {
+		if prev == nil {
+			prev = s
 			continue
 		}
-		if prev != nil {
-			delta := s.UsedCredits - prev.UsedCredits
-			if delta < 0 {
-				// Quota reset (or entitlement change): the new period's used
-				// total is the consumption since the reset.
-				delta = s.UsedCredits
-			}
-			day := s.FetchedAt.In(loc).Format("2006-01-02")
-			dc, ok := byDay[day]
-			if !ok {
-				dc = &DailyConsumption{Date: dayStart(s.FetchedAt, loc)}
-				byDay[day] = dc
-				order = append(order, day)
-			}
-			dc.Consumed += delta
-			dc.Samples++
+		if implausibleDrop(prev, s) {
+			// Placeholder or partial response: keep prev so the next real
+			// reading diffs against the last plausible one.
+			continue
 		}
+		delta := s.UsedCredits - prev.UsedCredits
+		if delta < 0 {
+			// Quota reset: the new period's used total is the consumption
+			// since the reset.
+			delta = s.UsedCredits
+		}
+		addConsumption(dayStart(s.FetchedAt, loc), delta)
 		prev = s
 	}
-
-	sort.Slice(order, func(i, j int) bool { return order[i] < order[j] })
-	out := make([]DailyConsumption, 0, len(order))
-	for _, day := range order {
-		out = append(out, *byDay[day])
-	}
 	return out, nil
+}
+
+// quotaReset reports whether a billing period ended between prev and s:
+// either GitHub moved the reset date forward, or s was fetched at or after
+// prev's reset date. Snapshots without a reset date never count as a reset.
+func quotaReset(prev, s *Snapshot) bool {
+	if prev.ResetAt.IsZero() || s.ResetAt.IsZero() {
+		return false
+	}
+	return s.ResetAt.After(prev.ResetAt) || !s.FetchedAt.Before(prev.ResetAt)
+}
+
+// implausibleDrop reports whether s shows fewer used credits than prev
+// without a quota reset. Used credits only grow within a billing period, so
+// such a reading comes from a placeholder response (for example an
+// entitlement of 1) and must not be treated as a reset: the next real reading
+// would otherwise count the full monthly usage again.
+func implausibleDrop(prev, s *Snapshot) bool {
+	return s.UsedCredits < prev.UsedCredits && !quotaReset(prev, s)
 }
 
 // dayStart returns midnight in loc for the given instant.

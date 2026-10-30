@@ -83,14 +83,16 @@ func TestAlerterDebouncesPerDay(t *testing.T) {
 
 func TestAlerterNotifiesAgainNextDay(t *testing.T) {
 	a, repo, state, notif, _ := newAlerterFixture(t, 2500)
-	mustStore(t, repo, okSnap(time.Date(2026, 6, 8, 9, 0, 0, 0, time.UTC), 0))
-	mustStore(t, repo, okSnap(time.Date(2026, 6, 8, 10, 0, 0, 0, time.UTC), 3000))
+	june := time.Date(2026, 6, 9, 0, 0, 0, 0, time.UTC)
+	july := time.Date(2026, 7, 9, 0, 0, 0, 0, time.UTC)
+	mustStore(t, repo, periodSnap(time.Date(2026, 6, 8, 9, 0, 0, 0, time.UTC), 0, june))
+	mustStore(t, repo, periodSnap(time.Date(2026, 6, 8, 10, 0, 0, 0, time.UTC), 3000, june))
 	// Fire on day 1.
 	a.Check(context.Background(), time.Date(2026, 6, 8, 10, 0, 0, 0, time.UTC))
 
-	// Day 2: fresh consumption crossing the limit again.
-	mustStore(t, repo, okSnap(time.Date(2026, 6, 9, 9, 0, 0, 0, time.UTC), 0))
-	mustStore(t, repo, okSnap(time.Date(2026, 6, 9, 10, 0, 0, 0, time.UTC), 2600))
+	// Day 2: the quota resets, then fresh consumption crosses the limit again.
+	mustStore(t, repo, periodSnap(time.Date(2026, 6, 9, 9, 0, 0, 0, time.UTC), 0, july))
+	mustStore(t, repo, periodSnap(time.Date(2026, 6, 9, 10, 0, 0, 0, time.UTC), 2600, july))
 	a.Check(context.Background(), time.Date(2026, 6, 9, 10, 0, 0, 0, time.UTC))
 
 	if notif.calls != 2 {
