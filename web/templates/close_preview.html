@@ -6,7 +6,7 @@
   <p>{{ T "TrackedWorkdays" }}: {{ .Tracked }}</p>
   <p>{{ T "Booked" }}: {{ .Booked }} &middot; {{ T "Unbooked" }}: {{ .Unbooked }}</p>
   <p>{{ T "TotalDuration" }}: {{ formatMinutes .TotalMinutes }}</p>
-  {{if .HasUnbookedWarning}}<p class="changed">{{ Tf "UnbookedDaysWarning" (dict "Count" .UnbookedCount) }}</p>{{end}}
+  {{if .Unbooked}}<p class="changed">{{ Tf "UnbookedDaysWarning" (dict "Count" .Unbooked) }}</p>{{end}}
   <form action="/booking/close" method="post">
     <input type="hidden" name="csrf_token" value="{{.CSRFToken}}">
     <label><input type="checkbox" name="confirm" value="true" required> {{ T "AcknowledgeUnbooked" }}</label>

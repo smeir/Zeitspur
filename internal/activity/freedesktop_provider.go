@@ -40,10 +40,8 @@ func newFreedesktopProvider(name string, services []string, idleThreshold time.D
 	if err != nil {
 		return nil, fmt.Errorf("connect session bus: %w", err)
 	}
-	logind, _ := newLogindChecker()
 	p := &FreedesktopProvider{
 		conn:          conn,
-		logind:        logind,
 		idleThreshold: idleThreshold,
 		name:          name,
 		services:      services,
@@ -57,9 +55,13 @@ func newFreedesktopProvider(name string, services []string, idleThreshold time.D
 	ctx, cancel := context.WithTimeout(context.Background(), dbusProbeTimeout)
 	defer cancel()
 	if _, err := p.queryIdleTime(ctx); err != nil {
+		// The probe error is the one to report; a close error adds nothing.
 		_ = conn.Close()
 		return nil, fmt.Errorf("%s idle service unavailable: %w", name, err)
 	}
+	// Connect to logind only for a usable provider, so a rejected provider
+	// leaves no system bus connection behind.
+	p.logind = optionalLogindChecker()
 	return p, nil
 }
 

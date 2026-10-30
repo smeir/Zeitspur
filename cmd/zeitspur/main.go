@@ -104,6 +104,7 @@ func (a *autoProvider) CurrentState(ctx context.Context) (activity.ActivityState
 
 	state, err := a.current.CurrentState(ctx)
 	if err != nil {
+		// Drop the broken provider; the state error is the one to report.
 		_ = a.current.Close()
 		a.current = nil
 		return activity.ActivityUnknown, err
@@ -142,6 +143,7 @@ func setup() (config.Config, config.Paths, *sql.DB, activity.ActivityProvider, e
 
 	ctx := context.Background()
 	if err := database.Migrate(ctx, db); err != nil {
+		// The migration error is the one to report.
 		_ = db.Close()
 		return config.Config{}, config.Paths{}, nil, nil, err
 	}
@@ -226,7 +228,9 @@ func runServe() error {
 		<-ctx.Done()
 		shutdownCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 		defer cancel()
-		_ = srv.Shutdown(shutdownCtx)
+		if err := srv.Shutdown(shutdownCtx); err != nil {
+			slog.Error("http server shutdown failed", "error", err)
+		}
 	}()
 
 	slog.Info("zeitspur serving", "address", server.ListenAddress())

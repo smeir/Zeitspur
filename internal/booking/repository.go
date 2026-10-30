@@ -42,11 +42,9 @@ func (r *Repository) GetDay(ctx context.Context, date string) (*DayStatus, error
 	if err != nil {
 		return nil, err
 	}
-	if bookedAt.Valid {
-		t, _ := time.Parse(time.RFC3339Nano, bookedAt.String)
-		ds.BookedAt = &t
+	if err := ds.setTimestamps(bookedAt, updatedAt); err != nil {
+		return nil, err
 	}
-	ds.UpdatedAt, _ = time.Parse(time.RFC3339Nano, updatedAt)
 	return &ds, nil
 }
 
@@ -132,12 +130,27 @@ func (r *Repository) ListDaysInRange(ctx context.Context, start, end string) ([]
 		if err := rows.Scan(&ds.WorkDate, &ds.Booked, &bookedAt, &updatedAt); err != nil {
 			return nil, err
 		}
-		if bookedAt.Valid {
-			t, _ := time.Parse(time.RFC3339Nano, bookedAt.String)
-			ds.BookedAt = &t
+		if err := ds.setTimestamps(bookedAt, updatedAt); err != nil {
+			return nil, err
 		}
-		ds.UpdatedAt, _ = time.Parse(time.RFC3339Nano, updatedAt)
 		result = append(result, &ds)
 	}
 	return result, rows.Err()
+}
+
+// setTimestamps parses the stored booked_at and updated_at columns.
+func (ds *DayStatus) setTimestamps(bookedAt sql.NullString, updatedAt string) error {
+	if bookedAt.Valid {
+		t, err := time.Parse(time.RFC3339Nano, bookedAt.String)
+		if err != nil {
+			return fmt.Errorf("parse booked_at %q: %w", bookedAt.String, err)
+		}
+		ds.BookedAt = &t
+	}
+	t, err := time.Parse(time.RFC3339Nano, updatedAt)
+	if err != nil {
+		return fmt.Errorf("parse updated_at %q: %w", updatedAt, err)
+	}
+	ds.UpdatedAt = t
+	return nil
 }

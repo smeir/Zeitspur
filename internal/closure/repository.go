@@ -287,10 +287,18 @@ func (r *Repository) scanClosure(row interface{ Scan(...any) error }) (*Closure,
 	if err != nil {
 		return nil, err
 	}
-	c.ClosedAt, _ = time.Parse(time.RFC3339Nano, closedAt)
-	c.PeriodStartObj, _ = time.Parse("2006-01-02", c.PeriodStart)
-	c.PeriodEndObj, _ = time.Parse("2006-01-02", c.PeriodEnd)
-	c.BookingDayObj, _ = time.Parse("2006-01-02", c.BookingDay)
+	if c.ClosedAt, err = time.Parse(time.RFC3339Nano, closedAt); err != nil {
+		return nil, fmt.Errorf("parse closed_at %q: %w", closedAt, err)
+	}
+	if c.PeriodStartObj, err = time.Parse("2006-01-02", c.PeriodStart); err != nil {
+		return nil, fmt.Errorf("parse period_start %q: %w", c.PeriodStart, err)
+	}
+	if c.PeriodEndObj, err = time.Parse("2006-01-02", c.PeriodEnd); err != nil {
+		return nil, fmt.Errorf("parse period_end %q: %w", c.PeriodEnd, err)
+	}
+	if c.BookingDayObj, err = time.Parse("2006-01-02", c.BookingDay); err != nil {
+		return nil, fmt.Errorf("parse booking_day %q: %w", c.BookingDay, err)
+	}
 	return &c, nil
 }
 
@@ -312,7 +320,9 @@ func (r *Repository) listDays(ctx context.Context, closureID int) ([]ClosureDay,
 		if err := rows.Scan(&d.ID, &d.ClosureID, &d.WorkDate, &d.BookedSnapshot, &d.TrackedMinutes); err != nil {
 			return nil, err
 		}
-		d.DateObj, _ = time.Parse("2006-01-02", d.WorkDate)
+		if d.DateObj, err = time.Parse("2006-01-02", d.WorkDate); err != nil {
+			return nil, fmt.Errorf("parse closure day work_date %q: %w", d.WorkDate, err)
+		}
 		days = append(days, d)
 	}
 	return days, rows.Err()

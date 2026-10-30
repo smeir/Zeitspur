@@ -113,8 +113,13 @@ func (e *Engine) Run(ctx context.Context) error {
 	var lastErr error
 	poll := func() {
 		if err := e.Process(ctx); err != nil {
+			// Record only the first error of a failure streak to avoid one
+			// event per poll while the provider stays unavailable.
 			if lastErr == nil {
-				_ = e.insertEvent(ctx, EventProviderError, map[string]any{"error": err.Error()})
+				slog.Warn("activity provider failed", "error", err)
+				if insertErr := e.insertEvent(ctx, EventProviderError, map[string]any{"error": err.Error()}); insertErr != nil {
+					slog.Error("insert provider error event failed", "error", insertErr)
+				}
 			}
 			lastErr = err
 		} else {
@@ -126,7 +131,9 @@ func (e *Engine) Run(ctx context.Context) error {
 		select {
 		case <-ctx.Done():
 			if e.lastState == ActivityActive {
-				_ = e.insertEventAt(context.Background(), EventSuspend, e.lastActiveAt, nil)
+				if err := e.insertEventAt(context.Background(), EventSuspend, e.lastActiveAt, nil); err != nil {
+					slog.Error("insert shutdown suspend event failed", "error", err)
+				}
 				e.reconcileCurrentDay(context.Background(), e.lastActiveAt)
 			}
 			return nil

@@ -166,6 +166,8 @@ func (s *Server) csrfMiddleware(next http.Handler) http.Handler {
 			token = cookie.Value
 		} else {
 			b := make([]byte, 16)
+			// crypto/rand.Read never returns an error since Go 1.24; it
+			// crashes the program if the system source fails.
 			_, _ = rand.Read(b)
 			token = hex.EncodeToString(b)
 			http.SetCookie(w, &http.Cookie{
@@ -220,6 +222,7 @@ func (s *Server) renderBlock(w http.ResponseWriter, r *http.Request, name, block
 		return
 	}
 	w.WriteHeader(status)
+	// A write error means the client went away; there is no one to report to.
 	_, _ = buf.WriteTo(w)
 }
 
@@ -246,6 +249,7 @@ func (s *Server) renderLayout(w http.ResponseWriter, r *http.Request, name strin
 		return
 	}
 	w.WriteHeader(status)
+	// A write error means the client went away; there is no one to report to.
 	_, _ = buf.WriteTo(w)
 }
 
@@ -253,13 +257,21 @@ func (s *Server) addActivityStatusData(ctx context.Context, data map[string]any)
 	if _, ok := data["ActivityStatus"].(string); ok {
 		return
 	}
-	state := activity.ActivityUnknown
-	if s.provider != nil {
-		if current, err := s.provider.CurrentState(ctx); err == nil {
-			state = current
-		}
+	data["ActivityStatus"] = string(s.currentActivityState(ctx))
+}
+
+// currentActivityState returns the provider's current state, or unknown when
+// there is no provider or it fails. The engine records provider failures as
+// provider_error events, so page renders and status polls do not log them.
+func (s *Server) currentActivityState(ctx context.Context) activity.ActivityState {
+	if s.provider == nil {
+		return activity.ActivityUnknown
 	}
-	data["ActivityStatus"] = string(state)
+	state, err := s.provider.CurrentState(ctx)
+	if err != nil {
+		return activity.ActivityUnknown
+	}
+	return state
 }
 
 // setTranslatedTitles converts raw title strings to translated text when the

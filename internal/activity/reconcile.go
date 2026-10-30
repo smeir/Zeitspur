@@ -211,8 +211,14 @@ func (r *Reconciler) loadIgnoredBlocks(ctx context.Context, tx *sql.Tx, dateStr 
 		if err := rows.Scan(&id, &startStr, &endStr); err != nil {
 			return nil, err
 		}
-		start, _ := time.Parse(time.RFC3339Nano, startStr)
-		end, _ := time.Parse(time.RFC3339Nano, endStr)
+		start, err := time.Parse(time.RFC3339Nano, startStr)
+		if err != nil {
+			return nil, fmt.Errorf("parse ignored block started_at %q: %w", startStr, err)
+		}
+		end, err := time.Parse(time.RFC3339Nano, endStr)
+		if err != nil {
+			return nil, fmt.Errorf("parse ignored block ended_at %q: %w", endStr, err)
+		}
 		ignored = append(ignored, ignoredBlock{
 			ID:    id,
 			Block: Block{Start: start, End: end},

@@ -168,3 +168,18 @@ func TestRepository_PeriodStart_FallbackToBookingDay(t *testing.T) {
 		t.Fatalf("expected period start 2026-04-30, got %s", got.Format("2006-01-02"))
 	}
 }
+
+func TestRepository_CorruptClosedAtReturnsError(t *testing.T) {
+	db := newTestDB(t)
+	ctx := context.Background()
+	if _, err := db.ExecContext(ctx, `
+		INSERT INTO booking_closures (period_start, period_end, booking_day, closed_at,
+			tracked_workday_count, booked_workday_count, unbooked_workday_count, tracked_minutes_snapshot)
+		VALUES ('2026-06-01', '2026-06-30', '2026-06-30', 'not-a-time', 0, 0, 0, 0)
+	`); err != nil {
+		t.Fatalf("insert closure: %v", err)
+	}
+	if _, err := NewRepository(db).List(ctx); err == nil {
+		t.Error("expected error for corrupt closed_at")
+	}
+}

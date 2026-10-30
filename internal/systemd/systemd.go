@@ -2,8 +2,10 @@
 package systemd
 
 import (
+	"errors"
 	"fmt"
 	"io"
+	"io/fs"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -64,7 +66,8 @@ func Install(currentBinary string) error {
 		return fmt.Errorf("mkdir unit dir: %w", err)
 	}
 
-	// Stop any running instance before replacing the binary.
+	// Stop any running instance before replacing the binary. On a first
+	// install the unit does not exist yet and systemctl fails; that is fine.
 	_ = run("systemctl", "--user", "stop", "zeitspur.service")
 
 	src, err := os.Open(currentBinary)
@@ -74,7 +77,9 @@ func Install(currentBinary string) error {
 	defer src.Close()
 
 	tmpPath := paths.BinaryPath + ".tmp"
-	_ = os.Remove(tmpPath)
+	if err := os.Remove(tmpPath); err != nil && !errors.Is(err, fs.ErrNotExist) {
+		return fmt.Errorf("remove stale temporary binary: %w", err)
+	}
 	dst, err := os.OpenFile(tmpPath, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, 0o755)
 	if err != nil {
 		return fmt.Errorf("open temporary binary: %w", err)
@@ -120,9 +125,13 @@ func Uninstall() error {
 		return err
 	}
 
+	// Stop and disable fail when the unit is not installed; uninstall stays
+	// re-runnable, and systemctl prints its own error output.
 	_ = run("systemctl", "--user", "stop", "zeitspur.service")
 	_ = run("systemctl", "--user", "disable", "zeitspur.service")
-	_ = os.Remove(paths.UnitPath)
+	if err := os.Remove(paths.UnitPath); err != nil && !errors.Is(err, fs.ErrNotExist) {
+		return fmt.Errorf("remove unit file: %w", err)
+	}
 
 	if err := run("systemctl", "--user", "daemon-reload"); err != nil {
 		return err

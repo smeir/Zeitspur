@@ -3,6 +3,7 @@ package activity
 import (
 	"context"
 	"errors"
+	"log/slog"
 	"os"
 
 	"github.com/godbus/dbus/v5"
@@ -11,6 +12,17 @@ import (
 type logindChecker struct {
 	sysConn     *dbus.Conn
 	sessionPath dbus.ObjectPath
+}
+
+// optionalLogindChecker returns a logind checker, or nil when logind is not
+// reachable. Providers then rely on their screensaver lock query alone.
+func optionalLogindChecker() *logindChecker {
+	checker, err := newLogindChecker()
+	if err != nil {
+		slog.Warn("logind lock state unavailable, using screensaver lock query only", "error", err)
+		return nil
+	}
+	return checker
 }
 
 func newLogindChecker() (*logindChecker, error) {

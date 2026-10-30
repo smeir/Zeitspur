@@ -300,9 +300,14 @@ func Write(path string, cfg Config) error {
 	if err != nil {
 		return fmt.Errorf("create config file: %w", err)
 	}
-	defer f.Close()
 	if err := toml.NewEncoder(f).Encode(cfg); err != nil {
+		// The encode error is the one to report.
+		_ = f.Close()
 		return fmt.Errorf("encode config: %w", err)
+	}
+	// Close reports delayed write errors, so a failed save is not silent.
+	if err := f.Close(); err != nil {
+		return fmt.Errorf("close config file: %w", err)
 	}
 	return nil
 }

@@ -60,14 +60,18 @@ func (s *Server) dayData(r *http.Request, date string, full bool) map[string]any
 	}
 
 	br := booking.NewRepository(s.db)
-	status, _ := br.GetDay(ctx, date)
-
-	state := activity.ActivityUnknown
-	if s.provider != nil {
-		state, _ = s.provider.CurrentState(ctx)
+	status, err := br.GetDay(ctx, date)
+	if err != nil {
+		slog.Error("day status failed", "error", err, "date", date)
+		status = &booking.DayStatus{WorkDate: date}
 	}
 
-	blocks, _ := s.blocksForDay(ctx, date)
+	state := s.currentActivityState(ctx)
+
+	blocks, err := s.blocksForDay(ctx, date)
+	if err != nil {
+		slog.Error("day blocks failed", "error", err, "date", date)
+	}
 
 	// The current running block and the "now" marker only make sense for today;
 	// for past or future days they would otherwise leak the current activity
@@ -213,12 +217,16 @@ func (s *Server) blocksForDay(ctx context.Context, date string) ([]blockView, er
 		if err := rows.Scan(&b.ID, &b.Date, &startStr, &endStr, &b.Source, &b.Status, &note); err != nil {
 			return nil, err
 		}
-		if t, err := time.Parse(time.RFC3339Nano, startStr); err == nil {
-			b.Start = t.In(loc)
+		start, err := time.Parse(time.RFC3339Nano, startStr)
+		if err != nil {
+			return nil, fmt.Errorf("parse started_at %q: %w", startStr, err)
 		}
-		if t, err := time.Parse(time.RFC3339Nano, endStr); err == nil {
-			b.End = t.In(loc)
+		end, err := time.Parse(time.RFC3339Nano, endStr)
+		if err != nil {
+			return nil, fmt.Errorf("parse ended_at %q: %w", endStr, err)
 		}
+		b.Start = start.In(loc)
+		b.End = end.In(loc)
 		b.StartStr = startStr
 		b.EndStr = endStr
 		if d := b.End.Sub(b.Start); d > 0 {
@@ -551,7 +559,10 @@ func weekChartBottomLabel(minutes int) string {
 func (s *Server) bookingAside(ctx context.Context, date time.Time, booked bool) map[string]any {
 	br := booking.NewRepository(s.db)
 	bookingDay, err := br.GetBookingDay(ctx)
-	if err != nil || bookingDay == nil {
+	if err != nil {
+		slog.Error("booking day failed", "error", err)
+	}
+	if bookingDay == nil {
 		return map[string]any{
 			"Configured": false,
 			"Booked":     booked,
@@ -560,9 +571,14 @@ func (s *Server) bookingAside(ctx context.Context, date time.Time, booked bool) 
 	now := s.clk.Now().In(s.location())
 	periodStart, err := closure.NewRepository(s.db).PeriodStart(ctx, *bookingDay)
 	if err != nil {
+		slog.Error("period start failed", "error", err)
 		periodStart = date
 	}
-	days, _ := timeline.NewService(s.db).Range(ctx, periodStart.Format("2006-01-02"), bookingDay.Format("2006-01-02"))
+	startStr, endStr := periodStart.Format("2006-01-02"), bookingDay.Format("2006-01-02")
+	days, err := timeline.NewService(s.db).Range(ctx, startStr, endStr)
+	if err != nil {
+		slog.Error("booking aside range failed", "error", err, "start", startStr, "end", endStr)
+	}
 	openDays := 0
 	for _, d := range days {
 		if !d.Booked {
@@ -653,7 +669,19 @@ func (s *Server) handleCopilot(w http.ResponseWriter, r *http.Request) {
 	displayUnit := s.config().CopilotDisplayUnit()
 
 	repo := copilot.NewRepository(s.db)
-	latest, _ := repo.Latest(ctx)
+	latest, err := repo.Latest(ctx)
+	if err != nil && err != sql.ErrNoRows {
+		slog.Error("copilot latest snapshot failed", "error", err)
+	}
+	// consumption logs query errors and renders the page with what it has,
+	// like the other read-only views.
+	consumption := func(from, to time.Time) []copilot.DailyConsumption {
+		entries, err := repo.Consumption(ctx, from, to, loc)
+		if err != nil {
+			slog.Error("copilot consumption failed", "error", err, "start", from, "end", to)
+		}
+		return entries
+	}
 
 	period := periodFromQuery(r.URL.Query().Get("period"))
 
@@ -680,9 +708,9 @@ func (s *Server) handleCopilot(w http.ResponseWriter, r *http.Request) {
 		next = start.AddDate(0, 0, 7)
 	}
 
-	consumption, _ := repo.Consumption(ctx, start, end, loc)
-	total := copilot.TotalConsumed(consumption)
-	chartDays := buildConsumptionDays(consumption, start, end, loc, now)
+	periodEntries := consumption(start, end)
+	total := copilot.TotalConsumed(periodEntries)
+	chartDays := buildConsumptionDays(periodEntries, start, end, loc, now)
 
 	// KPI cards are always relative to "now", independent of the selected
 	// period, so the dashboard's headline numbers stay stable while browsing.
@@ -693,9 +721,9 @@ func (s *Server) handleCopilot(w http.ResponseWriter, r *http.Request) {
 	monStart := time.Date(now.Year(), now.Month(), 1, 0, 0, 0, 0, loc)
 	monEnd := monStart.AddDate(0, 1, 0).Add(-time.Second)
 
-	todayEntries, _ := repo.Consumption(ctx, todayStart, todayEnd, loc)
-	yestEntries, _ := repo.Consumption(ctx, yestStart, yestEnd, loc)
-	monEntries, _ := repo.Consumption(ctx, monStart, monEnd, loc)
+	todayEntries := consumption(todayStart, todayEnd)
+	yestEntries := consumption(yestStart, yestEnd)
+	monEntries := consumption(monStart, monEnd)
 
 	todayCons := copilot.TotalConsumed(todayEntries)
 	yestCons := copilot.TotalConsumed(yestEntries)
@@ -748,7 +776,7 @@ func (s *Server) handleCopilot(w http.ResponseWriter, r *http.Request) {
 	}
 	if period == "month" {
 		data["ShowHeatmap"] = true
-		data["HeatmapRows"] = buildHeatmap(consumption, start, loc, now)
+		data["HeatmapRows"] = buildHeatmap(periodEntries, start, loc, now)
 		data["HeatmapDow"] = heatmapDow(s.locale())
 	}
 	if latest != nil {
@@ -1048,7 +1076,10 @@ func (s *Server) handleMonth(w http.ResponseWriter, r *http.Request) {
 	endStr := monthEnd.Format("2006-01-02")
 
 	tsvc := timeline.NewService(s.db)
-	days, _ := tsvc.Range(r.Context(), startStr, endStr)
+	days, err := tsvc.Range(r.Context(), startStr, endStr)
+	if err != nil {
+		slog.Error("month timeline range failed", "error", err, "start", startStr, "end", endStr)
+	}
 	dayMap := make(map[string]*timeline.DaySummary)
 	maxWork := 1
 	for _, d := range days {
@@ -1108,7 +1139,10 @@ func (s *Server) handleMonth(w http.ResponseWriter, r *http.Request) {
 func (s *Server) handleBooking(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	br := booking.NewRepository(s.db)
-	bookingDay, _ := br.GetBookingDay(ctx)
+	bookingDay, err := br.GetBookingDay(ctx)
+	if err != nil {
+		slog.Error("booking day failed", "error", err)
+	}
 
 	data := map[string]any{
 		"Title": "PageBooking",
@@ -1137,14 +1171,20 @@ func (s *Server) handleBooking(w http.ResponseWriter, r *http.Request) {
 	}
 	data["PeriodStart"] = periodStart
 	data["PeriodEnd"] = periodEnd
-	days, _ := tsvc.Range(ctx, periodStart.Format("2006-01-02"), periodEnd.Format("2006-01-02"))
+	days, err := tsvc.Range(ctx, periodStart.Format("2006-01-02"), periodEnd.Format("2006-01-02"))
+	if err != nil {
+		slog.Error("booking period range failed", "error", err, "start", periodStart, "end", periodEnd)
+	}
 	data["Days"] = days
 
 	// Days recorded after an overdue Booking Day already belong to the next
 	// period. They stay bookable so tracking never dead-ends on a missed closure.
 	if bookingDay != nil && bookingDay.Before(today) {
 		nextStart := bookingDay.AddDate(0, 0, 1)
-		nextDays, _ := tsvc.Range(ctx, nextStart.Format("2006-01-02"), today.Format("2006-01-02"))
+		nextDays, err := tsvc.Range(ctx, nextStart.Format("2006-01-02"), today.Format("2006-01-02"))
+		if err != nil {
+			slog.Error("next period range failed", "error", err, "start", nextStart, "end", today)
+		}
 		data["NextStart"] = nextStart
 		data["NextEnd"] = today
 		data["NextDays"] = nextDays
@@ -1165,9 +1205,17 @@ func (s *Server) handleBookingDay(w http.ResponseWriter, r *http.Request) {
 			http.Error(w, "invalid date", http.StatusBadRequest)
 			return
 		}
-		_ = br.SetBookingDay(ctx, d)
+		if err := br.SetBookingDay(ctx, d); err != nil {
+			slog.Error("set booking day failed", "error", err, "date", dateStr)
+			http.Error(w, "set booking day failed", http.StatusInternalServerError)
+			return
+		}
 	case "remove":
-		_ = br.ClearBookingDay(ctx)
+		if err := br.ClearBookingDay(ctx); err != nil {
+			slog.Error("clear booking day failed", "error", err)
+			http.Error(w, "clear booking day failed", http.StatusInternalServerError)
+			return
+		}
 	}
 	http.Redirect(w, r, "/booking", http.StatusFound)
 }
@@ -1188,36 +1236,47 @@ func (s *Server) handleBookingBulk(w http.ResponseWriter, r *http.Request) {
 	http.Redirect(w, r, "/booking", http.StatusFound)
 }
 
-func (s *Server) handleClosePreview(w http.ResponseWriter, r *http.Request) {
-	ctx := r.Context()
-	br := booking.NewRepository(s.db)
-	bookingDay, err := br.GetBookingDay(ctx)
-	if err != nil || bookingDay == nil {
+// openPeriod loads the Booking Day, the start of the open period it closes,
+// and the period's day summaries. On failure it writes the HTTP error and
+// returns ok=false.
+func (s *Server) openPeriod(ctx context.Context, w http.ResponseWriter) (bookingDay, periodStart time.Time, days []*timeline.DaySummary, ok bool) {
+	day, err := booking.NewRepository(s.db).GetBookingDay(ctx)
+	if err != nil {
+		slog.Error("booking day failed", "error", err)
+		http.Error(w, "failed to load booking day", http.StatusInternalServerError)
+		return
+	}
+	if day == nil {
 		http.Error(w, "no booking day", http.StatusBadRequest)
 		return
 	}
+	bookingDay = *day
 
-	periodStart, err := closure.NewRepository(s.db).PeriodStart(ctx, *bookingDay)
+	periodStart, err = closure.NewRepository(s.db).PeriodStart(ctx, bookingDay)
 	if err != nil {
 		slog.Error("period start failed", "error", err)
 		http.Error(w, "failed to compute period start", http.StatusInternalServerError)
 		return
 	}
-	periodStartStr := periodStart.Format("2006-01-02")
-	periodEndStr := bookingDay.Format("2006-01-02")
 
-	tsvc := timeline.NewService(s.db)
-	days, _ := tsvc.Range(ctx, periodStartStr, periodEndStr)
+	startStr, endStr := periodStart.Format("2006-01-02"), bookingDay.Format("2006-01-02")
+	days, err = timeline.NewService(s.db).Range(ctx, startStr, endStr)
+	if err != nil {
+		slog.Error("open period range failed", "error", err, "start", startStr, "end", endStr)
+		http.Error(w, "failed to load period", http.StatusInternalServerError)
+		return
+	}
+	return bookingDay, periodStart, days, true
+}
 
-	var summaries []closure.DaySummary
-	var tracked, booked, unbooked, total int
+func (s *Server) handleClosePreview(w http.ResponseWriter, r *http.Request) {
+	bookingDay, periodStart, days, ok := s.openPeriod(r.Context(), w)
+	if !ok {
+		return
+	}
+
+	var booked, unbooked, total int
 	for _, d := range days {
-		summaries = append(summaries, closure.DaySummary{
-			Date:           d.Date,
-			Booked:         d.Booked,
-			TrackedMinutes: d.WorkedMinutes,
-		})
-		tracked++
 		total += d.WorkedMinutes
 		if d.Booked {
 			booked++
@@ -1227,54 +1286,50 @@ func (s *Server) handleClosePreview(w http.ResponseWriter, r *http.Request) {
 	}
 
 	s.render(w, r, "close_preview", map[string]any{
-		"BookingDay":         bookingDay,
-		"PeriodStart":        periodStart,
-		"PeriodEnd":          bookingDay,
-		"Tracked":            tracked,
-		"Booked":             booked,
-		"Unbooked":           unbooked,
-		"TotalMinutes":       total,
-		"HasUnbookedWarning": unbooked > 0,
-		"UnbookedCount":      unbooked,
+		"BookingDay":   bookingDay,
+		"PeriodStart":  periodStart,
+		"PeriodEnd":    bookingDay,
+		"Tracked":      len(days),
+		"Booked":       booked,
+		"Unbooked":     unbooked,
+		"TotalMinutes": total,
 	}, http.StatusOK)
 }
 
 func (s *Server) handleClose(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	confirmed := r.FormValue("confirm") == "true"
-	br := booking.NewRepository(s.db)
-	bookingDay, err := br.GetBookingDay(ctx)
-	if err != nil || bookingDay == nil {
-		http.Error(w, "no booking day", http.StatusBadRequest)
-		return
-	}
 
 	cr := closure.NewRepository(s.db)
-	locked, _ := cr.AcquireLock(ctx)
+	locked, err := cr.AcquireLock(ctx)
+	if err != nil {
+		slog.Error("acquire closure lock failed", "error", err)
+		http.Error(w, "failed to acquire closure lock", http.StatusInternalServerError)
+		return
+	}
 	if !locked {
 		http.Error(w, "another closure is in progress", http.StatusConflict)
 		return
 	}
-	defer cr.ReleaseLock(ctx)
+	defer func() {
+		// Release the lock even when the client cancelled the request;
+		// a lock left behind would block every later closure.
+		if err := cr.ReleaseLock(context.WithoutCancel(ctx)); err != nil {
+			slog.Error("release closure lock failed", "error", err)
+		}
+	}()
 
-	periodStart, err := cr.PeriodStart(ctx, *bookingDay)
-	if err != nil {
-		slog.Error("period start failed", "error", err)
-		http.Error(w, "failed to compute period start", http.StatusInternalServerError)
+	bookingDay, _, days, ok := s.openPeriod(ctx, w)
+	if !ok {
 		return
 	}
-	periodStartStr := periodStart.Format("2006-01-02")
-	periodEndStr := bookingDay.Format("2006-01-02")
-
-	tsvc := timeline.NewService(s.db)
-	days, _ := tsvc.Range(ctx, periodStartStr, periodEndStr)
 	if len(days) == 0 {
 		http.Error(w, "no days to close", http.StatusBadRequest)
 		return
 	}
 
 	var unbooked int
-	var summaries []closure.DaySummary
+	summaries := make([]closure.DaySummary, 0, len(days))
 	for _, d := range days {
 		if !d.Booked {
 			unbooked++
@@ -1291,20 +1346,27 @@ func (s *Server) handleClose(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if _, err := cr.Create(ctx, periodEndStr, summaries); err != nil {
+	if _, err := cr.Create(ctx, bookingDay.Format("2006-01-02"), summaries); err != nil {
 		slog.Error("closure failed", "error", err)
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
 
-	_ = br.ClearBookingDay(ctx)
+	// The closure is stored; a failure to clear the Booking Day only leaves a
+	// stale date behind, so log it and continue to the closures list.
+	if err := booking.NewRepository(s.db).ClearBookingDay(ctx); err != nil {
+		slog.Error("clear booking day after closure failed", "error", err)
+	}
 	http.Redirect(w, r, "/closures", http.StatusFound)
 }
 
 func (s *Server) handleClosures(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	cr := closure.NewRepository(s.db)
-	closures, _ := cr.List(ctx)
+	closures, err := cr.List(ctx)
+	if err != nil {
+		slog.Error("list closures failed", "error", err)
+	}
 
 	br := booking.NewRepository(s.db)
 	type closureView struct {
@@ -1313,9 +1375,7 @@ func (s *Server) handleClosures(w http.ResponseWriter, r *http.Request) {
 	}
 	var views []closureView
 	for _, c := range closures {
-		statuses, _ := br.ListDaysInRange(ctx, c.PeriodStart, c.PeriodEnd)
-		differs, _ := cr.HasDifferenceSinceClosure(ctx, c.ID, statuses)
-		views = append(views, closureView{Closure: c, Differs: differs})
+		views = append(views, closureView{Closure: c, Differs: closureDiffers(ctx, br, cr, &c)})
 	}
 
 	s.renderLayout(w, r, "closures", map[string]any{
@@ -1327,17 +1387,24 @@ func (s *Server) handleClosures(w http.ResponseWriter, r *http.Request) {
 
 func (s *Server) handleClosureDetail(w http.ResponseWriter, r *http.Request) {
 	idStr := chi.URLParam(r, "id")
-	id, _ := strconv.Atoi(idStr)
+	id, err := strconv.Atoi(idStr)
+	if err != nil {
+		http.Error(w, "not found", http.StatusNotFound)
+		return
+	}
 	cr := closure.NewRepository(s.db)
 	c, err := cr.Get(r.Context(), id)
-	if err != nil || c == nil {
+	if err != nil {
+		slog.Error("get closure failed", "error", err, "id", id)
+		http.Error(w, "failed to load closure", http.StatusInternalServerError)
+		return
+	}
+	if c == nil {
 		http.Error(w, "not found", http.StatusNotFound)
 		return
 	}
 
-	br := booking.NewRepository(s.db)
-	statuses, _ := br.ListDaysInRange(r.Context(), c.PeriodStart, c.PeriodEnd)
-	differs, _ := cr.HasDifferenceSinceClosure(r.Context(), c.ID, statuses)
+	differs := closureDiffers(r.Context(), booking.NewRepository(s.db), cr, c)
 
 	s.renderLayout(w, r, "closure_detail", map[string]any{
 		"Title":   "PageClosureDetail",
@@ -1345,6 +1412,23 @@ func (s *Server) handleClosureDetail(w http.ResponseWriter, r *http.Request) {
 		"Closure": c,
 		"Differs": differs,
 	}, http.StatusOK)
+}
+
+// closureDiffers reports whether booking states changed since the closure.
+// Query errors are logged and reported as no difference, because comparing
+// against a missing status list would flag every closure as changed.
+func closureDiffers(ctx context.Context, br *booking.Repository, cr *closure.Repository, c *closure.Closure) bool {
+	statuses, err := br.ListDaysInRange(ctx, c.PeriodStart, c.PeriodEnd)
+	if err != nil {
+		slog.Error("list day statuses failed", "error", err, "closure", c.ID)
+		return false
+	}
+	differs, err := cr.HasDifferenceSinceClosure(ctx, c.ID, statuses)
+	if err != nil {
+		slog.Error("closure difference check failed", "error", err, "closure", c.ID)
+		return false
+	}
+	return differs
 }
 
 func (s *Server) handleSettings(w http.ResponseWriter, r *http.Request) {

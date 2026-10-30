@@ -1,8 +1,10 @@
 package web
 
 import (
+	"bytes"
 	"context"
 	"database/sql"
+	"log/slog"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
@@ -194,6 +196,68 @@ func TestServer_BlockDeleteDatabaseErrorReturns500(t *testing.T) {
 	srv.ServeHTTP(rr, req)
 	if rr.Code != http.StatusInternalServerError {
 		t.Fatalf("expected 500, got %d", rr.Code)
+	}
+}
+
+func TestServer_DayViewSurvivesDayStatusError(t *testing.T) {
+	srv, db := newTestServer(t)
+	// A failing day status query used to leave status nil and panic on
+	// status.Booked; the view must log and render instead.
+	if _, err := db.Exec(`DROP TABLE day_status`); err != nil {
+		t.Fatalf("drop table: %v", err)
+	}
+	rr := httptest.NewRecorder()
+	srv.ServeHTTP(rr, httptest.NewRequest(http.MethodGet, "/day/2026-06-13", nil))
+	if rr.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d", rr.Code)
+	}
+}
+
+func TestServer_BookingDayDatabaseErrorReturns500(t *testing.T) {
+	srv, db := newTestServer(t)
+	token := fetchCSRToken(t, srv)
+	if _, err := db.Exec(`DROP TABLE booking_settings`); err != nil {
+		t.Fatalf("drop table: %v", err)
+	}
+	for _, body := range []string{"action=set&date=2026-06-30", "action=remove"} {
+		req := httptest.NewRequest(http.MethodPost, "/booking-day", strings.NewReader("csrf_token="+token+"&"+body))
+		req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+		req.AddCookie(&http.Cookie{Name: "csrf_token", Value: token})
+		rr := httptest.NewRecorder()
+		srv.ServeHTTP(rr, req)
+		if rr.Code != http.StatusInternalServerError {
+			t.Errorf("%s: expected 500, got %d", body, rr.Code)
+		}
+	}
+}
+
+func TestServer_ReadViewsLogQueryErrors(t *testing.T) {
+	srv, db := newTestServer(t)
+	var logs bytes.Buffer
+	prevLogger := slog.Default()
+	slog.SetDefault(slog.New(slog.NewTextHandler(&logs, nil)))
+	t.Cleanup(func() { slog.SetDefault(prevLogger) })
+
+	if _, err := db.Exec(`DROP TABLE booking_closures`); err != nil {
+		t.Fatalf("drop table: %v", err)
+	}
+	if _, err := db.Exec(`DROP TABLE work_blocks`); err != nil {
+		t.Fatalf("drop table: %v", err)
+	}
+	for path, want := range map[string]string{
+		"/month":    "month timeline range failed",
+		"/booking":  "booking period range failed",
+		"/closures": "list closures failed",
+	} {
+		logs.Reset()
+		rr := httptest.NewRecorder()
+		srv.ServeHTTP(rr, httptest.NewRequest(http.MethodGet, path, nil))
+		if rr.Code != http.StatusOK {
+			t.Errorf("%s: expected 200, got %d", path, rr.Code)
+		}
+		if !strings.Contains(logs.String(), want) {
+			t.Errorf("%s: logs missing %q: %s", path, want, logs.String())
+		}
 	}
 }
 
@@ -411,6 +475,40 @@ func TestServer_CopilotPageRendersStatusCard(t *testing.T) {
 	for _, gone := range []string{"Letzter Abruf"} {
 		if strings.Contains(body, gone) {
 			t.Errorf("copilot page still contains trimmed label %q", gone)
+		}
+	}
+}
+
+func TestServer_CopilotPageLogsQueryErrors(t *testing.T) {
+	srv, db := newTestServer(t)
+	var logs bytes.Buffer
+	prevLogger := slog.Default()
+	slog.SetDefault(slog.New(slog.NewTextHandler(&logs, nil)))
+	t.Cleanup(func() { slog.SetDefault(prevLogger) })
+
+	get := func() {
+		t.Helper()
+		rr := httptest.NewRecorder()
+		srv.ServeHTTP(rr, httptest.NewRequest(http.MethodGet, "/copilot", nil))
+		if rr.Code != http.StatusOK {
+			t.Fatalf("expected 200, got %d", rr.Code)
+		}
+	}
+
+	// No snapshots yet is a normal state, not an error.
+	get()
+	if logs.Len() != 0 {
+		t.Fatalf("empty state logged: %s", logs.String())
+	}
+
+	// A broken table must be logged while the page still renders.
+	if _, err := db.Exec(`DROP TABLE copilot_snapshots`); err != nil {
+		t.Fatalf("drop table: %v", err)
+	}
+	get()
+	for _, want := range []string{"copilot latest snapshot failed", "copilot consumption failed"} {
+		if !strings.Contains(logs.String(), want) {
+			t.Errorf("logs missing %q: %s", want, logs.String())
 		}
 	}
 }
@@ -861,6 +959,70 @@ func TestStatusLabelCoverage(t *testing.T) {
 				t.Errorf("ActivityState %q in %q fell back to unknown label %q", s, locale, unknown)
 			}
 		}
+	}
+}
+
+func TestServer_ClosePreviewAndClose(t *testing.T) {
+	srv, db := newBookingTestServer(t, time.Date(2026, 6, 18, 8, 0, 0, 0, time.UTC))
+	ctx := context.Background()
+	if _, err := db.ExecContext(ctx, `
+		INSERT INTO work_blocks (work_date, started_at, ended_at, source, status, created_at, updated_at)
+		VALUES ('2026-06-16', '2026-06-16T09:00:00Z', '2026-06-16T10:00:00Z', 'detected', 'active', '2026-06-16T09:00:00Z', '2026-06-16T09:00:00Z')
+	`); err != nil {
+		t.Fatalf("insert block: %v", err)
+	}
+	if _, err := db.ExecContext(ctx, `
+		INSERT INTO booking_settings (id, current_booking_day, updated_at)
+		VALUES (1, '2026-06-17', '2026-06-17T09:00:00Z')
+	`); err != nil {
+		t.Fatalf("insert booking day: %v", err)
+	}
+
+	rr := httptest.NewRecorder()
+	srv.ServeHTTP(rr, httptest.NewRequest(http.MethodGet, "/booking/close-preview", nil))
+	if rr.Code != http.StatusOK {
+		t.Fatalf("preview: expected 200, got %d", rr.Code)
+	}
+	if !strings.Contains(rr.Body.String(), `class="changed"`) {
+		t.Errorf("preview misses the unbooked warning:\n%s", rr.Body.String())
+	}
+
+	token := fetchCSRToken(t, srv)
+	post := func(body string) int {
+		t.Helper()
+		req := httptest.NewRequest(http.MethodPost, "/booking/close", strings.NewReader("csrf_token="+token+body))
+		req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+		req.AddCookie(&http.Cookie{Name: "csrf_token", Value: token})
+		rr := httptest.NewRecorder()
+		srv.ServeHTTP(rr, req)
+		return rr.Code
+	}
+	if code := post(""); code != http.StatusBadRequest {
+		t.Fatalf("unconfirmed close: expected 400, got %d", code)
+	}
+	if code := post("&confirm=true"); code != http.StatusFound {
+		t.Fatalf("confirmed close: expected 302, got %d", code)
+	}
+
+	var closures, locks int
+	var bookingDay sql.NullString
+	if err := db.QueryRowContext(ctx, `SELECT COUNT(*) FROM booking_closures`).Scan(&closures); err != nil {
+		t.Fatalf("count closures: %v", err)
+	}
+	if err := db.QueryRowContext(ctx, `SELECT COUNT(*) FROM closure_lock`).Scan(&locks); err != nil {
+		t.Fatalf("count locks: %v", err)
+	}
+	if err := db.QueryRowContext(ctx, `SELECT current_booking_day FROM booking_settings WHERE id = 1`).Scan(&bookingDay); err != nil && err != sql.ErrNoRows {
+		t.Fatalf("read booking day: %v", err)
+	}
+	if closures != 1 {
+		t.Errorf("closures = %d, want 1", closures)
+	}
+	if locks != 0 {
+		t.Errorf("closure lock left behind (%d rows)", locks)
+	}
+	if bookingDay.Valid {
+		t.Errorf("booking day not cleared: %q", bookingDay.String)
 	}
 }
 

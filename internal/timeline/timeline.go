@@ -37,7 +37,10 @@ func (s *Service) Day(ctx context.Context, date string) (*DaySummary, error) {
 		return nil, err
 	}
 	if len(list) == 0 {
-		dateObj, _ := time.Parse("2006-01-02", date)
+		dateObj, err := time.Parse("2006-01-02", date)
+		if err != nil {
+			return nil, fmt.Errorf("parse date %q: %w", date, err)
+		}
 		return &DaySummary{Date: date, DateObj: dateObj}, nil
 	}
 	return list[0], nil
@@ -72,7 +75,9 @@ func (s *Service) summarize(ctx context.Context, start, end string) ([]*DaySumma
 		if err := rows.Scan(&ds.Date, &ds.Booked); err != nil {
 			return nil, err
 		}
-		ds.DateObj, _ = time.Parse("2006-01-02", ds.Date)
+		if ds.DateObj, err = time.Parse("2006-01-02", ds.Date); err != nil {
+			return nil, fmt.Errorf("parse day_status work_date %q: %w", ds.Date, err)
+		}
 		statusByDate[ds.Date] = &ds
 	}
 	if err := rows.Err(); err != nil {
@@ -98,7 +103,10 @@ func (s *Service) summarize(ctx context.Context, start, end string) ([]*DaySumma
 			return nil, err
 		}
 		if _, ok := statusByDate[date]; !ok {
-			dateObj, _ := time.Parse("2006-01-02", date)
+			dateObj, err := time.Parse("2006-01-02", date)
+			if err != nil {
+				return nil, fmt.Errorf("parse work_blocks work_date %q: %w", date, err)
+			}
 			statusByDate[date] = &DaySummary{Date: date, DateObj: dateObj}
 		}
 		if status == "deleted" || status == "ignored" {

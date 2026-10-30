@@ -75,3 +75,21 @@ func TestRepository_BookingDay(t *testing.T) {
 		t.Fatalf("expected nil booking day, got %v", day)
 	}
 }
+
+func TestRepository_CorruptTimestampReturnsError(t *testing.T) {
+	db := newTestDB(t)
+	ctx := context.Background()
+	if _, err := db.ExecContext(ctx, `
+		INSERT INTO day_status (work_date, booked, booked_at, updated_at)
+		VALUES ('2026-06-13', 1, 'not-a-time', '2026-06-13T09:00:00Z')
+	`); err != nil {
+		t.Fatalf("insert day status: %v", err)
+	}
+	r := NewRepository(db)
+	if _, err := r.GetDay(ctx, "2026-06-13"); err == nil {
+		t.Error("GetDay: expected error for corrupt booked_at")
+	}
+	if _, err := r.ListDaysInRange(ctx, "2026-06-01", "2026-06-30"); err == nil {
+		t.Error("ListDaysInRange: expected error for corrupt booked_at")
+	}
+}

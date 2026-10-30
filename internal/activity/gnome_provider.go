@@ -32,15 +32,18 @@ func NewGNOMEProvider(idleThreshold time.Duration) (*GNOMEProvider, error) {
 	if err != nil {
 		return nil, fmt.Errorf("connect session bus: %w", err)
 	}
-	logind, _ := newLogindChecker()
-	p := &GNOMEProvider{conn: conn, logind: logind, idleThreshold: idleThreshold}
+	p := &GNOMEProvider{conn: conn, idleThreshold: idleThreshold}
 
 	ctx, cancel := context.WithTimeout(context.Background(), dbusProbeTimeout)
 	defer cancel()
 	if _, err := p.idleTime(ctx); err != nil {
+		// The probe error is the one to report; a close error adds nothing.
 		_ = conn.Close()
 		return nil, fmt.Errorf("gnome idle monitor unavailable: %w", err)
 	}
+	// Connect to logind only for a usable provider, so a rejected provider
+	// leaves no system bus connection behind.
+	p.logind = optionalLogindChecker()
 	return p, nil
 }
 

@@ -168,6 +168,8 @@ sequenceDiagram
 | Lock only | `internal/activity/lock_only_provider.go` | Uses logind lock state only. It reports unlocked sessions as active, so idle time is ignored while screen lock and suspend still end work blocks. |
 | Mock | `internal/activity/mock.go` | Programmable state for tests and fallback when D-Bus is unavailable. |
 
+The GNOME and Freedesktop providers also read the logind session lock state when the system bus allows it. They connect to logind only after their idle probe succeeds, so a rejected provider leaves no system bus connection open. Without logind they log a warning and use their screensaver lock query alone.
+
 At startup the CLI chooses providers based on `activity.mode`. In `idle_and_lock` mode it tries GNOME → Freedesktop, so KDE and other freedesktop-compatible desktops are used automatically when the GNOME-specific interfaces are not present. In `lock_only` mode it uses the lock-only provider.
 
 The engine (`internal/activity/engine.go`) runs a ticker at `poll_interval`. On each tick it asks the provider for the current state and records an event only when the state changes:
@@ -297,7 +299,7 @@ flowchart TD
 - `PeriodStart` determines the first day of the next open period from the last closure, the earliest work block, or the Booking Day.
 - `Create` writes an immutable `booking_closures` record plus one `booking_closure_days` snapshot row per day.
 - `HasDifferenceSinceClosure` compares current `day_status` revisions and booked flags against the snapshot.
-- A simple advisory lock in `closure_lock` prevents concurrent closures.
+- A simple advisory lock in `closure_lock` prevents concurrent closures. The close handler releases it with a context that ignores request cancellation, so an aborted request cannot leave the lock behind.
 
 Closing a period requires confirmation when unbooked days remain. After a successful closure the Booking Day is cleared.
 
