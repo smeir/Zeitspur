@@ -1,3 +1,26 @@
+{{ define "bookingdays" }}
+  <form action="/booking/bulk" method="post">
+    <input type="hidden" name="csrf_token" value="{{ .CSRFToken }}">
+    <table>
+      <thead>
+       <tr><th><input type="checkbox" class="select-all" onclick="this.closest('table').querySelectorAll('.day-check').forEach(c=>c.checked=this.checked)"></th><th>{{ T "Day" }}</th><th>{{ T "Worked" }}</th><th>{{ T "Status" }}</th></tr>
+      </thead>
+      <tbody>
+      {{ range .Days }}
+       <tr>
+         <td><input type="checkbox" class="day-check" name="dates" value="{{ .Date }}"></td>
+         <td>{{ dateShort .DateObj }}</td>
+         <td>{{ formatMinutes .WorkedMinutes }}</td>
+         <td class="{{ if .Booked }}booked{{ else }}unbooked{{ end }}">{{ bookedLabel .Booked }}</td>
+       </tr>
+      {{ end }}
+      </tbody>
+    </table>
+    <button type="submit" name="booked" value="true">{{ T "MarkSelectedBooked" }}</button>
+    <button type="submit" name="booked" value="false" class="secondary">{{ T "MarkSelectedNotBooked" }}</button>
+  </form>
+{{ end }}
+
 {{ define "content" }}
 <div class="card">
   <h2>{{ T "BookingDay" }}</h2>
@@ -26,32 +49,26 @@
   </form>
 </div>
 
-{{ if .BookingDay }}
 <div class="card">
   <h2>{{ T "OpenBookingPeriod" }}</h2>
   <p>{{ dateShort .PeriodStart }} - {{ dateShort .PeriodEnd }}</p>
-  <form action="/booking/bulk" method="post">
-    <input type="hidden" name="csrf_token" value="{{ .CSRFToken }}">
-    <table>
-      <thead>
-       <tr><th><input type="checkbox" id="select-all" onclick="document.querySelectorAll('.day-check').forEach(c=>c.checked=this.checked)"></th><th>{{ T "Day" }}</th><th>{{ T "Worked" }}</th><th>{{ T "Status" }}</th></tr>
-      </thead>
-      <tbody>
-      {{ range .Days }}
-       <tr>
-         <td><input type="checkbox" class="day-check" name="dates" value="{{ .Date }}"></td>
-         <td>{{ dateShort .DateObj }}</td>
-         <td>{{ formatMinutes .WorkedMinutes }}</td>
-         <td class="{{ if .Booked }}booked{{ else }}unbooked{{ end }}">{{ bookedLabel .Booked }}</td>
-       </tr>
-      {{ end }}
-      </tbody>
-    </table>
-    <button type="submit" name="booked" value="true">{{ T "MarkSelectedBooked" }}</button>
-    <button type="submit" name="booked" value="false" class="secondary">{{ T "MarkSelectedNotBooked" }}</button>
-  </form>
+  {{ if .Days }}
+    {{ template "bookingdays" (dict "CSRFToken" .CSRFToken "Days" .Days) }}
+  {{ else }}
+    <p>{{ T "NoDaysInPeriod" }}</p>
+  {{ end }}
 </div>
 
+{{ if .NextDays }}
+<div class="card">
+  <h2>{{ T "DaysAfterBookingDay" }}</h2>
+  <p>{{ dateShort .NextStart }} - {{ dateShort .NextEnd }}</p>
+  <p>{{ T "DaysAfterBookingDayHint" }}</p>
+  {{ template "bookingdays" (dict "CSRFToken" .CSRFToken "Days" .NextDays) }}
+</div>
+{{ end }}
+
+{{ if .BookingDay }}
 <div class="card">
   <h2>{{ T "ClosePeriod" }}</h2>
   <a class="btn" href="/booking/close-preview">{{ T "PreviewClosure" }}</a>

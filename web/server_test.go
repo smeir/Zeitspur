@@ -863,3 +863,80 @@ func TestStatusLabelCoverage(t *testing.T) {
 		}
 	}
 }
+
+// newBookingTestServer builds a server with a fixed clock so booking-period
+// boundaries are deterministic.
+func newBookingTestServer(t *testing.T, now time.Time) (*Server, *sql.DB) {
+	t.Helper()
+	db, err := database.Open(t.TempDir() + "/test.db")
+	if err != nil {
+		t.Fatalf("open db: %v", err)
+	}
+	if err := database.Migrate(context.Background(), db); err != nil {
+		t.Fatalf("migrate: %v", err)
+	}
+	cfg := config.Config{}
+	cfg.Server.ListenAddress = "127.0.0.1:8787"
+	cfg.App.Timezone = "UTC"
+	paths := config.Paths{ConfigFile: t.TempDir() + "/config.toml"}
+	provider := activity.NewMockProvider(activity.ActivityActive)
+	srv, err := NewServer(db, cfg, paths, provider, clock.NewFixed(now), "test")
+	if err != nil {
+		t.Fatalf("new server: %v", err)
+	}
+	return srv, db
+}
+
+func TestServer_BookingListsDaysAfterOverdueBookingDay(t *testing.T) {
+	srv, db := newBookingTestServer(t, time.Date(2026, 6, 18, 8, 0, 0, 0, time.UTC))
+	ctx := context.Background()
+	if _, err := db.ExecContext(ctx, `
+		INSERT INTO work_blocks (work_date, started_at, ended_at, source, status, created_at, updated_at)
+		VALUES
+		('2026-06-16', '2026-06-16T09:00:00Z', '2026-06-16T10:00:00Z', 'detected', 'active', '2026-06-16T09:00:00Z', '2026-06-16T09:00:00Z'),
+		('2026-06-18', '2026-06-18T09:00:00Z', '2026-06-18T10:00:00Z', 'detected', 'active', '2026-06-18T09:00:00Z', '2026-06-18T09:00:00Z')
+	`); err != nil {
+		t.Fatalf("insert blocks: %v", err)
+	}
+	if _, err := db.ExecContext(ctx, `
+		INSERT INTO booking_settings (id, current_booking_day, updated_at)
+		VALUES (1, '2026-06-17', '2026-06-17T09:00:00Z')
+	`); err != nil {
+		t.Fatalf("insert booking day: %v", err)
+	}
+
+	req := httptest.NewRequest(http.MethodGet, "/booking", nil)
+	rr := httptest.NewRecorder()
+	srv.ServeHTTP(rr, req)
+	if rr.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d", rr.Code)
+	}
+	body := rr.Body.String()
+	if !strings.Contains(body, `value="2026-06-18"`) {
+		t.Errorf("expected day after overdue booking day to be bookable, got body:\n%s", body)
+	}
+	if !strings.Contains(body, `value="2026-06-16"`) {
+		t.Errorf("expected open period day to stay bookable, got body:\n%s", body)
+	}
+}
+
+func TestServer_BookingListsDaysWithoutBookingDay(t *testing.T) {
+	srv, db := newBookingTestServer(t, time.Date(2026, 6, 18, 8, 0, 0, 0, time.UTC))
+	if _, err := db.ExecContext(context.Background(), `
+		INSERT INTO work_blocks (work_date, started_at, ended_at, source, status, created_at, updated_at)
+		VALUES
+		('2026-06-18', '2026-06-18T09:00:00Z', '2026-06-18T10:00:00Z', 'detected', 'active', '2026-06-18T09:00:00Z', '2026-06-18T09:00:00Z')
+	`); err != nil {
+		t.Fatalf("insert blocks: %v", err)
+	}
+
+	req := httptest.NewRequest(http.MethodGet, "/booking", nil)
+	rr := httptest.NewRecorder()
+	srv.ServeHTTP(rr, req)
+	if rr.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d", rr.Code)
+	}
+	if !strings.Contains(rr.Body.String(), `value="2026-06-18"`) {
+		t.Errorf("expected days to be bookable without a booking day, got body:\n%s", rr.Body.String())
+	}
+}

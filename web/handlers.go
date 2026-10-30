@@ -1115,28 +1115,39 @@ func (s *Server) handleBooking(w http.ResponseWriter, r *http.Request) {
 		"Nav":   "booking",
 	}
 
+	// The booking day is parsed as UTC midnight; compare against today's
+	// local date at UTC midnight. Truncate(24h) would cut at UTC midnight
+	// of the current instant and be off by one in the early morning hours.
+	now := s.clk.Now().In(s.location())
+	today := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, time.UTC)
+	tsvc := timeline.NewService(s.db)
+
+	// The open period ends on the Booking Day; without one it runs up to today.
+	periodEnd := today
 	if bookingDay != nil {
 		data["BookingDay"] = bookingDay
-		// The booking day is parsed as UTC midnight; compare against today's
-		// local date at UTC midnight. Truncate(24h) would cut at UTC midnight
-		// of the current instant and be off by one in the early morning hours.
-		now := s.clk.Now().In(s.location())
-		today := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, time.UTC)
 		data["Overdue"] = bookingDay.Before(today)
 		data["DaysRemaining"] = int(bookingDay.Sub(today).Hours() / 24)
+		periodEnd = *bookingDay
+	}
 
-		periodStart, err := closure.NewRepository(s.db).PeriodStart(ctx, *bookingDay)
-		if err != nil {
-			slog.Error("period start failed", "error", err)
-		}
-		periodStartStr := periodStart.Format("2006-01-02")
-		periodEndStr := bookingDay.Format("2006-01-02")
-		data["PeriodStart"] = periodStart
-		data["PeriodEnd"] = bookingDay
+	periodStart, err := closure.NewRepository(s.db).PeriodStart(ctx, periodEnd)
+	if err != nil {
+		slog.Error("period start failed", "error", err)
+	}
+	data["PeriodStart"] = periodStart
+	data["PeriodEnd"] = periodEnd
+	days, _ := tsvc.Range(ctx, periodStart.Format("2006-01-02"), periodEnd.Format("2006-01-02"))
+	data["Days"] = days
 
-		tsvc := timeline.NewService(s.db)
-		days, _ := tsvc.Range(ctx, periodStartStr, periodEndStr)
-		data["Days"] = days
+	// Days recorded after an overdue Booking Day already belong to the next
+	// period. They stay bookable so tracking never dead-ends on a missed closure.
+	if bookingDay != nil && bookingDay.Before(today) {
+		nextStart := bookingDay.AddDate(0, 0, 1)
+		nextDays, _ := tsvc.Range(ctx, nextStart.Format("2006-01-02"), today.Format("2006-01-02"))
+		data["NextStart"] = nextStart
+		data["NextEnd"] = today
+		data["NextDays"] = nextDays
 	}
 
 	s.renderLayout(w, r, "booking", data, http.StatusOK)

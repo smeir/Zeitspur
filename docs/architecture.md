@@ -262,6 +262,12 @@ flowchart LR
 - `SetBooked` toggles the booked flag and records `booked_at`.
 - `SetBookingDay` / `ClearBookingDay` configure the manual Booking Day that drives the open booking period.
 
+The `/booking` page always offers a bookable day list, independent of the Booking Day:
+
+- With a Booking Day, the open period runs from `PeriodStart` to the Booking Day.
+- Without a Booking Day, the list runs from `PeriodStart` to today, so days stay bookable after a closure cleared the Booking Day.
+- When the Booking Day has passed, a second list covers the days from the day after the Booking Day up to today. Those days already belong to the next period; closure boundaries are unaffected.
+
 ## Closure Lifecycle
 
 ```mermaid
